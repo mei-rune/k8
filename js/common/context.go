@@ -26,11 +26,13 @@ import (
 	"github.com/dop251/goja"
 )
 
-type ctxKey int
+type runtimeCtxKey struct{}
 
-const (
-	ctxKeyRuntime ctxKey = iota
-)
+func (runtimeCtxKey) String() string {
+	return "k8-runtime-ctx"
+}
+
+var ctxKeyRuntime = runtimeCtxKey{}
 
 func WithRuntime(ctx context.Context, rt *goja.Runtime) context.Context {
 	return context.WithValue(ctx, ctxKeyRuntime, rt)
@@ -43,3 +45,11 @@ func GetRuntime(ctx context.Context) *goja.Runtime {
 	}
 	return v.(*goja.Runtime)
 }
+
+type CurrentDir string
+
+type BridgeContext struct {
+	CtxPtr     *context.Context
+	CurrentDir CurrentDir
+}
+

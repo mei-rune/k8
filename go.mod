@@ -21,7 +21,6 @@ require (
 	github.com/runner-mei/log v1.0.2
 	github.com/runner-mei/moo v0.0.0-20200227042737-b53fca99fe68
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
-	github.com/sirupsen/logrus v1.4.1
 	github.com/spf13/afero v1.2.2
 	github.com/stretchr/testify v1.4.0
 	github.com/tidwall/gjson v1.5.0

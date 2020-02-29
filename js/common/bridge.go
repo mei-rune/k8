@@ -31,11 +31,14 @@ import (
 )
 
 var (
-	ctxPtrT = reflect.TypeOf((*context.Context)(nil))
-	ctxT    = reflect.TypeOf((*context.Context)(nil)).Elem()
-	errorT  = reflect.TypeOf((*error)(nil)).Elem()
-	jsValT  = reflect.TypeOf((*goja.Value)(nil)).Elem()
-	fnCallT = reflect.TypeOf((*goja.FunctionCall)(nil)).Elem()
+	BridgeContextPtrT = reflect.TypeOf((*BridgeContext)(nil))
+	BridgeContextT    = reflect.TypeOf((*BridgeContext)(nil)).Elem()
+	CurrentDirT       = reflect.TypeOf((*CurrentDir)(nil)).Elem()
+	ctxPtrT           = reflect.TypeOf((*context.Context)(nil))
+	ctxT              = reflect.TypeOf((*context.Context)(nil)).Elem()
+	errorT            = reflect.TypeOf((*error)(nil)).Elem()
+	jsValT            = reflect.TypeOf((*goja.Value)(nil)).Elem()
+	fnCallT           = reflect.TypeOf((*goja.FunctionCall)(nil)).Elem()
 
 	constructWrap = goja.MustCompile(
 		"__constructor__",
@@ -134,7 +137,7 @@ func BindToGlobal(rt *goja.Runtime, data map[string]interface{}) func() {
 }
 
 // Bind the provided value v to the provided runtime
-func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]interface{} {
+func Bind(rt *goja.Runtime, v interface{}, ctxPtr *BridgeContext) map[string]interface{} {
 	exports := make(map[string]interface{})
 
 	val := reflect.ValueOf(v)
@@ -151,6 +154,10 @@ func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]i
 		hasError := (numOut > 1 && fnT.Out(1) == errorT)
 		wantsContext := false
 		wantsContextPtr := false
+		wantsCurrentDir := false
+		wantsBContext := false
+		wantsBContextPtr := false
+
 		if numIn > 0 {
 			in0 := fnT.In(0)
 			switch in0 {
@@ -158,9 +165,15 @@ func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]i
 				wantsContext = true
 			case ctxPtrT:
 				wantsContextPtr = true
+			case BridgeContextPtrT:
+				wantsBContextPtr = true
+			case BridgeContextT:
+				wantsBContext = true
+			case CurrentDirT:
+				wantsCurrentDir = true
 			}
 		}
-		if hasError || wantsContext || wantsContextPtr {
+		if hasError || wantsContext || wantsContextPtr || wantsBContext || wantsBContextPtr || wantsCurrentDir {
 			isVariadic := fnT.IsVariadic()
 			realFn := fn
 			fn = reflect.ValueOf(func(call goja.FunctionCall) goja.Value {
@@ -171,13 +184,22 @@ func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]i
 				// Inject any requested parameters, and reserve them to offset user args.
 				reservedArgs := 0
 				if wantsContext {
-					if ctxPtr == nil || *ctxPtr == nil {
+					if ctxPtr == nil || ctxPtr.CtxPtr == nil || *ctxPtr.CtxPtr == nil {
 						Throw(rt, errors.Errorf("%s() can only be called from within default()", name))
 					}
-					args[0] = reflect.ValueOf(*ctxPtr)
+					args[0] = reflect.ValueOf(*ctxPtr.CtxPtr)
 					reservedArgs++
 				} else if wantsContextPtr {
+					args[0] = reflect.ValueOf(ctxPtr.CtxPtr)
+					reservedArgs++
+				} else if wantsBContext {
+					args[0] = reflect.ValueOf(*ctxPtr)
+					reservedArgs++
+				} else if wantsBContextPtr {
 					args[0] = reflect.ValueOf(ctxPtr)
+					reservedArgs++
+				} else if wantsCurrentDir {
+					args[0] = reflect.ValueOf(ctxPtr.CurrentDir)
 					reservedArgs++
 				}
 

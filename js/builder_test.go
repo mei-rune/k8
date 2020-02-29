@@ -22,13 +22,18 @@ package js
 
 import (
 	"context"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/runner-mei/k8/js/compiler"
 	"github.com/runner-mei/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/godoc/vfs"
 	"golang.org/x/tools/godoc/vfs/mapfs"
 )
@@ -60,44 +65,69 @@ func getSimpleBuilder(filename, data string, opts ...interface{}) (*Builder, err
 		return nil, err
 	}
 
-	builder.Compile(filename, []byte(data))
-	return builder, nil
+	err = builder.Compile(filename, []byte(data))
+	return builder, err
 }
 
 func TestNewBuilder(t *testing.T) {
 	t.Run("Blank", func(t *testing.T) {
-		_, err := getSimpleBuilder("/script.js", "")
+		b, err := getSimpleBuilder("/script.js", "")
+		if err == nil {
+			_, err = b.Build(nil)
+		}
+
 		assert.EqualError(t, err, "script must export a default function")
 	})
 	t.Run("Invalid", func(t *testing.T) {
-		_, err := getSimpleBuilder("/script.js", "\x00")
+		b, err := getSimpleBuilder("/script.js", "\x00")
+		if err == nil {
+			_, err = b.Build(nil)
+		}
 		assert.NotNil(t, err)
 		if err != nil {
-			assert.Contains(t, err.Error(), "SyntaxError: file:///script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
+			assert.Contains(t, err.Error(), "SyntaxError: /script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
 		}
 	})
 	t.Run("Error", func(t *testing.T) {
-		_, err := getSimpleBuilder("/script.js", `throw new Error("aaaa");`)
-		assert.EqualError(t, err, "Error: aaaa at file:///script.js:1:7(3)")
+		b, err := getSimpleBuilder("/script.js", `throw new Error("aaaa");`)
+		if err == nil {
+			_, err = b.Build(nil)
+		}
+		assert.EqualError(t, err, "Error: aaaa at /script.js:1:7(3)")
 	})
 	t.Run("InvalidExports", func(t *testing.T) {
-		_, err := getSimpleBuilder("/script.js", `exports = null`)
+		b, err := getSimpleBuilder("/script.js", `exports = null`)
+		if err == nil {
+			_, err = b.Build(nil)
+		}
 		assert.EqualError(t, err, "exports must be an object")
 	})
 	t.Run("DefaultUndefined", func(t *testing.T) {
-		_, err := getSimpleBuilder("/script.js", `export default undefined;`)
+		b, err := getSimpleBuilder("/script.js", `export default undefined;`)
+		if err == nil {
+			_, err = b.Build(nil)
+		}
 		assert.EqualError(t, err, "script must export a default function")
 	})
 	t.Run("DefaultNull", func(t *testing.T) {
-		_, err := getSimpleBuilder("/script.js", `export default null;`)
+		b, err := getSimpleBuilder("/script.js", `export default null;`)
+		if err == nil {
+			_, err = b.Build(nil)
+		}
 		assert.EqualError(t, err, "script must export a default function")
 	})
 	t.Run("DefaultWrongType", func(t *testing.T) {
-		_, err := getSimpleBuilder("/script.js", `export default 12345;`)
+		b, err := getSimpleBuilder("/script.js", `export default 12345;`)
+		if err == nil {
+			_, err = b.Build(nil)
+		}
 		assert.EqualError(t, err, "default export must be a function")
 	})
 	t.Run("Minimal", func(t *testing.T) {
-		_, err := getSimpleBuilder("/script.js", `export default function() {};`)
+		b, err := getSimpleBuilder("/script.js", `export default function() {};`)
+		if err == nil {
+			_, err = b.Build(nil)
+		}
 		assert.NoError(t, err)
 	})
 	// t.Run("stdin", func(t *testing.T) {
@@ -110,14 +140,20 @@ func TestNewBuilder(t *testing.T) {
 	t.Run("CompatibilityMode", func(t *testing.T) {
 		t.Run("Extended/ok/CoreJS", func(t *testing.T) {
 			compatMode := compiler.CompatibilityModeExtended.String()
-			_, err := getSimpleBuilder("/script.js",
+			b, err := getSimpleBuilder("/script.js",
 				`export default function() {}; new Set([1, 2, 3, 2, 1]);`, compatMode)
+			if err == nil {
+				_, err = b.Build(nil)
+			}
 			assert.NoError(t, err)
 		})
 		t.Run("Base/ok/Minimal", func(t *testing.T) {
 			compatMode := compiler.CompatibilityModeBase.String()
-			_, err := getSimpleBuilder("/script.js",
+			b, err := getSimpleBuilder("/script.js",
 				`module.exports.default = function() {};`, compatMode)
+			if err == nil {
+				_, err = b.Build(nil)
+			}
 			assert.NoError(t, err)
 		})
 		t.Run("Base/err", func(t *testing.T) {
@@ -131,21 +167,24 @@ func TestNewBuilder(t *testing.T) {
 					`invalid compatibility mode "es1". Use: "extended", "base"`},
 				// ES2015 modules are not supported
 				{"Modules", "base", `export default function() {};`,
-					"file:///script.js: Line 1:1 Unexpected reserved word"},
+					"/script.js: Line 1:1 Unexpected reserved word"},
 				// Arrow functions are not supported
 				{"ArrowFuncs", "base",
 					`module.exports.default = function() {}; () => {};`,
-					"file:///script.js: Line 1:42 Unexpected token ) (and 1 more errors)"},
+					"/script.js: Line 1:42 Unexpected token ) (and 1 more errors)"},
 				// ES2015 objects polyfilled by core.js are not supported
 				{"CoreJS", "base",
 					`module.exports.default = function() {}; new Set([1, 2, 3, 2, 1]);`,
-					"ReferenceError: Set is not defined at file:///script.js:1:45(5)"},
+					"ReferenceError: Set is not defined at /script.js:1:45(5)"},
 			}
 
 			for _, tc := range testCases {
 				tc := tc
 				t.Run(tc.name, func(t *testing.T) {
-					_, err := getSimpleBuilder("/script.js", tc.code, tc.compatMode)
+					b, err := getSimpleBuilder("/script.js", tc.code, tc.compatMode)
+					if err == nil {
+						_, err = b.Build(nil)
+					}
 					assert.EqualError(t, err, tc.expErr)
 				})
 			}
@@ -153,158 +192,144 @@ func TestNewBuilder(t *testing.T) {
 	})
 }
 
-// func TestOpen(t *testing.T) {
-// 	var testCases = [...]struct {
-// 		name           string
-// 		openPath       string
-// 		pwd            string
-// 		isError        bool
-// 		isArchiveError bool
-// 	}{
-// 		{
-// 			name:     "notOpeningUrls",
-// 			openPath: "github.com",
-// 			isError:  true,
-// 			pwd:      "/path/to",
-// 		},
-// 		{
-// 			name:     "simple",
-// 			openPath: "file.txt",
-// 			pwd:      "/path/to",
-// 		},
-// 		{
-// 			name:     "simple with dot",
-// 			openPath: "./file.txt",
-// 			pwd:      "/path/to",
-// 		},
-// 		{
-// 			name:     "simple with two dots",
-// 			openPath: "../to/file.txt",
-// 			pwd:      "/path/not",
-// 		},
-// 		{
-// 			name:     "fullpath",
-// 			openPath: "/path/to/file.txt",
-// 			pwd:      "/path/to",
-// 		},
-// 		{
-// 			name:     "fullpath2",
-// 			openPath: "/path/to/file.txt",
-// 			pwd:      "/path",
-// 		},
-// 		{
-// 			name:     "file is dir",
-// 			openPath: "/path/to/",
-// 			pwd:      "/path/to",
-// 			isError:  true,
-// 		},
-// 		{
-// 			name:     "file is missing",
-// 			openPath: "/path/to/missing.txt",
-// 			isError:  true,
-// 		},
-// 		{
-// 			name:     "relative1",
-// 			openPath: "to/file.txt",
-// 			pwd:      "/path",
-// 		},
-// 		{
-// 			name:     "relative2",
-// 			openPath: "./path/to/file.txt",
-// 			pwd:      "/",
-// 		},
-// 		{
-// 			name:     "relative wonky",
-// 			openPath: "../path/to/file.txt",
-// 			pwd:      "/path",
-// 		},
-// 		{
-// 			name:     "empty open doesn't panic",
-// 			openPath: "",
-// 			pwd:      "/path",
-// 			isError:  true,
-// 		},
-// 	}
-// 	fss := map[string]func() (afero.Fs, string, func()){
-// 		"MemMapFS": func() (afero.Fs, string, func()) {
-// 			fs := afero.NewMemMapFs()
-// 			require.NoError(t, fs.MkdirAll("/path/to", 0755))
-// 			require.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644))
-// 			return fs, "", func() {}
-// 		},
-// 		"OsFS": func() (afero.Fs, string, func()) {
-// 			prefix, err := ioutil.TempDir("", "k6_open_test")
-// 			require.NoError(t, err)
-// 			fs := afero.NewOsFs()
-// 			filePath := filepath.Join(prefix, "/path/to/file.txt")
-// 			require.NoError(t, fs.MkdirAll(filepath.Join(prefix, "/path/to"), 0755))
-// 			require.NoError(t, afero.WriteFile(fs, filePath, []byte(`hi`), 0644))
-// 			if isWindows {
-// 				fs = fsext.NewTrimFilePathSeparatorFs(fs)
-// 			}
-// 			return fs, prefix, func() { require.NoError(t, os.RemoveAll(prefix)) }
-// 		},
-// 	}
+func TestOpen(t *testing.T) {
+	var testCases = [...]struct {
+		name           string
+		openPath       string
+		pwd            string
+		isError        bool
+		isArchiveError bool
+	}{
+		{
+			name:     "notOpeningUrls",
+			openPath: "github.com",
+			isError:  true,
+			pwd:      "/path/to",
+		},
+		{
+			name:     "simple",
+			openPath: "file.txt",
+			pwd:      "/path/to",
+		},
+		{
+			name:     "simple with dot",
+			openPath: "./file.txt",
+			pwd:      "/path/to",
+		},
+		{
+			name:     "simple with two dots",
+			openPath: "../to/file.txt",
+			pwd:      "/path/not",
+		},
+		{
+			name:     "fullpath",
+			openPath: "/path/to/file.txt",
+			pwd:      "/path/to",
+		},
+		{
+			name:     "fullpath2",
+			openPath: "/path/to/file.txt",
+			pwd:      "/path",
+		},
+		{
+			name:     "file is dir",
+			openPath: "/path/to/",
+			pwd:      "/path/to",
+			isError:  true,
+		},
+		{
+			name:     "file is missing",
+			openPath: "/path/to/missing.txt",
+			isError:  true,
+		},
+		{
+			name:     "relative1",
+			openPath: "to/file.txt",
+			pwd:      "/path",
+		},
+		{
+			name:     "relative2",
+			openPath: "./path/to/file.txt",
+			pwd:      "/",
+		},
+		{
+			name:     "relative wonky",
+			openPath: "../path/to/file.txt",
+			pwd:      "/path",
+		},
+		{
+			name:     "empty open doesn't panic",
+			openPath: "",
+			pwd:      "/path",
+			isError:  true,
+		},
+	}
+	fss := map[string]func() (vfs.FileSystem, string, func()){
+		"MemMapFS": func() (vfs.FileSystem, string, func()) {
+			return mapfs.New(map[string]string{
+				"path/to/file.txt": "hi",
+			}), "", func() {}
+		},
+		"OsFS": func() (vfs.FileSystem, string, func()) {
+			prefix, err := ioutil.TempDir("", "k6_open_test")
+			require.NoError(t, err)
+			filePath := filepath.Join(prefix, "path/to/file.txt")
+			require.NoError(t, os.MkdirAll(filepath.Join(prefix, "path/to"), 0755))
+			require.NoError(t, ioutil.WriteFile(filePath, []byte(`hi`), 0644))
+			return vfs.OS(prefix), prefix, func() { require.NoError(t, os.RemoveAll(prefix)) }
+		},
+	}
 
-// 	for name, fsInit := range fss {
-// 		fs, prefix, cleanUp := fsInit()
-// 		defer cleanUp()
-// 		fs = afero.NewReadOnlyFs(fs)
-// 		t.Run(name, func(t *testing.T) {
-// 			for _, tCase := range testCases {
-// 				tCase := tCase
+	for name, fsInit := range fss {
+		t.Run(name, func(t *testing.T) {
+			fs, _, cleanUp := fsInit()
+			defer cleanUp()
 
-// 				var testFunc = func(t *testing.T) {
-// 					var openPath = tCase.openPath
-// 					// if fullpath prepend prefix
-// 					if openPath != "" && (openPath[0] == '/' || openPath[0] == '\\') {
-// 						openPath = filepath.Join(prefix, openPath)
-// 					}
-// 					if isWindows {
-// 						openPath = strings.Replace(openPath, `\`, `\\`, -1)
-// 					}
-// 					var pwd = tCase.pwd
-// 					if pwd == "" {
-// 						pwd = "/path/to/"
-// 					}
-// 					data := `
-// 						export let file = open("` + openPath + `");
-// 						export default function() { return file };`
+			for _, tCase := range testCases {
+				tCase := tCase
 
-// 					sourceBuilder, err := getSimpleBuilder(filepath.ToSlash(filepath.Join(prefix, pwd, "script.js")), data, fs)
-// 					if tCase.isError {
-// 						assert.Error(t, err)
-// 						return
-// 					}
-// 					require.NoError(t, err)
+				var testFunc = func(t *testing.T) {
+					var openPath = tCase.openPath
 
-// 					arcBuilder, err := NewBuilderFromArchive(sourceBuilder.makeArchive(), lib.RuntimeOptions{})
+					var pwd = tCase.pwd
+					if pwd == "" {
+						pwd = "/path/to/"
+					}
+					if isWindows {
+						openPath = strings.Replace(openPath, `\`, `\\`, -1)
+					}
+					data := `
+						export let file = open("` + openPath + `");
+						export default function() { return file };`
 
-// 					require.NoError(t, err)
+					sourceBuilder, err := getSimpleBuilder(filepath.ToSlash(filepath.Join(pwd, "script.js")), data, fs)
 
-// 					for source, b := range map[string]*Builder{"source": sourceBuilder, "archive": arcBuilder} {
-// 						b := b
-// 						t.Run(source, func(t *testing.T) {
-// 							bi, err := b.Instantiate()
-// 							require.NoError(t, err)
-// 							v, err := bi.Default(goja.Undefined())
-// 							require.NoError(t, err)
-// 							assert.Equal(t, "hi", v.Export())
-// 						})
-// 					}
-// 				}
+					require.NoError(t, err)
 
-// 				t.Run(tCase.name, testFunc)
-// 				if isWindows {
-// 					// windowsify the testcase
-// 					tCase.openPath = strings.Replace(tCase.openPath, `/`, `\`, -1)
-// 					tCase.pwd = strings.Replace(tCase.pwd, `/`, `\`, -1)
-// 					t.Run(tCase.name+" with windows slash", testFunc)
-// 				}
-// 			}
-// 		})
-// 	}
-// }
+					r, err := sourceBuilder.Build(nil)
+					if tCase.isError {
+						assert.Error(t, err)
+						return
+					}
+					require.NoError(t, err)
+					v, err := r.RunDefaultMethod(context.Background(), goja.Undefined())
+					require.NoError(t, err)
+					assert.Equal(t, "hi", v)
+				}
+
+				t.Run(tCase.name, testFunc)
+				if isWindows {
+
+					// windowsify the testcase
+					tCase.openPath = strings.Replace(tCase.openPath, `/`, `\`, -1)
+					tCase.pwd = strings.Replace(tCase.pwd, `/`, `\`, -1)
+
+					t.Run(tCase.name+" with windows slash", testFunc)
+				}
+			}
+		})
+	}
+}
 
 func TestBuilderInstantiate(t *testing.T) {
 	b, err := getSimpleBuilder("/script.js", `
@@ -342,7 +367,7 @@ func TestBuilderInstantiate(t *testing.T) {
 }
 
 func TestBuilderEnv(t *testing.T) {
-	env :=  map[string]string{
+	env := map[string]string{
 		"TEST_A": "1",
 		"TEST_B": "",
 	}

@@ -26,8 +26,9 @@ type Method struct {
 // A Runner is a self-contained instance of a Bundle.
 type Runner struct {
 	NoCookiesReset *bool
-	Runtime        *goja.Runtime
+	InitContext    *InitContext
 	Context        *context.Context
+	Runtime        *goja.Runtime
 	Default        goja.Callable
 	Methods        map[string]Method
 }

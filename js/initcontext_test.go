@@ -1,6 +1,6 @@
 /*
  *
- * k6 - a next-generation load testing tool
+ * k8 - a next-generation load testing tool
  * Copyright (C) 2016 Load Impact
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,222 +20,237 @@
 
 package js
 
-// import (
-// 	"context"
-// 	"fmt"
-// 	"net"
-// 	"net/http"
-// 	"net/http/httptest"
-// 	"path/filepath"
-// 	"testing"
-// 	"time"
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+	"testing"
 
-// 	"github.com/dop251/goja"
-// 	"github.com/oxtoacart/bpool"
-// 	"github.com/spf13/afero"
-// 	"github.com/stretchr/testify/assert"
-// 	"github.com/stretchr/testify/require"
+	"github.com/dop251/goja"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-// 	"github.com/runner-mei/k8/js/common"
-// 	"github.com/runner-mei/k8/lib"
-// 	"github.com/runner-mei/k8/lib/netext"
-// 	"github.com/runner-mei/log"
-// 	"golang.org/x/tools/godoc/vfs/mapfs"
-// )
+	"golang.org/x/tools/godoc/vfs/mapfs"
+)
 
-// func TestInitContextRequire(t *testing.T) {
-// 	t.Run("Modules", func(t *testing.T) {
-// 		t.Run("Nonexistent", func(t *testing.T) {
-// 			_, err := getSimpleBundle("/script.js", `import "k6/NONEXISTENT";`)
-// 			assert.EqualError(t, err, "GoError: unknown builtin module: k6/NONEXISTENT")
-// 		})
+func TestInitContextRequire(t *testing.T) {
+	t.Run("Modules", func(t *testing.T) {
+		t.Run("Nonexistent", func(t *testing.T) {
+			b, err := getSimpleBuilder("/script.js", `import "k8/NONEXISTENT";`)
+			if err == nil {
+				_, err = b.Build(nil)
+			}
+			assert.EqualError(t, err, "GoError: unknown builtin module: k8/NONEXISTENT")
+		})
 
-// 		t.Run("k6", func(t *testing.T) {
-// 			b, err := getSimpleBundle("/script.js", `
-// 					import k6 from "k6";
-// 					export let _k6 = k6;
-// 					export let dummy = "abc123";
-// 					export default function() {}
-// 			`)
-// 			if !assert.NoError(t, err, "bundle error") {
-// 				return
-// 			}
+		t.Run("k8", func(t *testing.T) {
+			b, err := getSimpleBuilder("/script.js", `
+					import k8 from "k8";
+					export let _k8 = k8;
+					export let dummy = "abc123";
+					export default function() {}
+			`)
+			if !assert.NoError(t, err, "bundle error") {
+				return
+			}
 
-// 			bi, err := b.Instantiate()
-// 			if !assert.NoError(t, err, "instance error") {
-// 				return
-// 			}
+			bi, err := b.Build(nil)
+			if !assert.NoError(t, err, "instance error") {
+				return
+			}
 
-// 			exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
-// 			if assert.NotNil(t, exports) {
-// 				_, defaultOk := goja.AssertFunction(exports.Get("default"))
-// 				assert.True(t, defaultOk, "default export is not a function")
-// 				assert.Equal(t, "abc123", exports.Get("dummy").String())
-// 			}
+			exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
+			if assert.NotNil(t, exports) {
+				_, defaultOk := goja.AssertFunction(exports.Get("default"))
+				assert.True(t, defaultOk, "default export is not a function")
+				assert.Equal(t, "abc123", exports.Get("dummy").String())
+			}
 
-// 			k6 := bi.Runtime.Get("_k6").ToObject(bi.Runtime)
-// 			if assert.NotNil(t, k6) {
-// 				_, groupOk := goja.AssertFunction(k6.Get("group"))
-// 				assert.True(t, groupOk, "k6.group is not a function")
-// 			}
+			k8 := bi.Runtime.Get("_k8").ToObject(bi.Runtime)
+			if assert.NotNil(t, k8) {
+				_, groupOk := goja.AssertFunction(k8.Get("sleep"))
+				assert.True(t, groupOk, "k8.sleep is not a function")
+			}
 
-// 			t.Run("group", func(t *testing.T) {
-// 				b, err := getSimpleBundle("/script.js", `
-// 						import { group } from "k6";
-// 						export let _group = group;
-// 						export let dummy = "abc123";
-// 						export default function() {}
-// 				`)
-// 				if !assert.NoError(t, err) {
-// 					return
-// 				}
+			t.Run("sleep", func(t *testing.T) {
+				b, err := getSimpleBuilder("/script.js", `
+						import { sleep } from "k8";
+						export let _sleep = sleep;
+						export let dummy = "abc123";
+						export default function() {}
+				`)
+				if !assert.NoError(t, err) {
+					return
+				}
 
-// 				bi, err := b.Instantiate()
-// 				if !assert.NoError(t, err) {
-// 					return
-// 				}
+				bi, err := b.Build(nil)
+				if !assert.NoError(t, err) {
+					return
+				}
 
-// 				exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
-// 				if assert.NotNil(t, exports) {
-// 					_, defaultOk := goja.AssertFunction(exports.Get("default"))
-// 					assert.True(t, defaultOk, "default export is not a function")
-// 					assert.Equal(t, "abc123", exports.Get("dummy").String())
-// 				}
+				exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
+				if assert.NotNil(t, exports) {
+					_, defaultOk := goja.AssertFunction(exports.Get("default"))
+					assert.True(t, defaultOk, "default export is not a function")
+					assert.Equal(t, "abc123", exports.Get("dummy").String())
+				}
 
-// 				_, groupOk := goja.AssertFunction(exports.Get("_group"))
-// 				assert.True(t, groupOk, "{ group } is not a function")
-// 			})
-// 		})
-// 	})
+				_, groupOk := goja.AssertFunction(exports.Get("_sleep"))
+				assert.True(t, groupOk, "{ sleep } is not a function")
+			})
+		})
+	})
 
-// 	t.Run("Files", func(t *testing.T) {
-// 		t.Run("Nonexistent", func(t *testing.T) {
-// 			path := filepath.FromSlash("/nonexistent.js")
-// 			_, err := getSimpleBundle("/script.js", `import "/nonexistent.js"; export default function() {}`)
-// 			assert.NotNil(t, err)
-// 			assert.Contains(t, err.Error(), fmt.Sprintf(`"file://%s" couldn't be found on local disk`, filepath.ToSlash(path)))
-// 		})
-// 		t.Run("Invalid", func(t *testing.T) {
-// 			fs := mapfs.New(map[string]string{
-// 				"/file.js": string([]byte{0x00}),
-// 			})
-// 			//assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte{0x00}, 0755))
-// 			_, err := getSimpleBundle("/script.js", `import "/file.js"; export default function() {}`, fs)
-// 			require.Error(t, err)
-// 			assert.Contains(t, err.Error(), "SyntaxError: file:///file.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
-// 		})
-// 		t.Run("Error", func(t *testing.T) {
-// 			fs := mapfs.New(map[string]string{
-// 				"/file.js": `throw new Error("aaaa")`,
-// 			})
-// 			_, err := getSimpleBundle("/script.js", `import "/file.js"; export default function() {}`, fs)
-// 			assert.EqualError(t, err, "Error: aaaa at file:///file.js:2:7(4)")
-// 		})
+	t.Run("Files", func(t *testing.T) {
+		t.Run("Nonexistent", func(t *testing.T) {
+			path := filepath.FromSlash("/nonexistent.js")
+			b, err := getSimpleBuilder("/script.js", `import "/nonexistent.js"; export default function() {}`)
 
-// 		imports := map[string]struct {
-// 			LibPath    string
-// 			ConstPaths map[string]string
-// 		}{
-// 			"./lib.js": {"/path/to/lib.js", map[string]string{
-// 				"":               "",
-// 				"./const.js":     "/path/to/const.js",
-// 				"../const.js":    "/path/const.js",
-// 				"./sub/const.js": "/path/to/sub/const.js",
-// 			}},
-// 			"../lib.js": {"/path/lib.js", map[string]string{
-// 				"":               "",
-// 				"./const.js":     "/path/const.js",
-// 				"../const.js":    "/const.js",
-// 				"./sub/const.js": "/path/sub/const.js",
-// 			}},
-// 			"./dir/lib.js": {"/path/to/dir/lib.js", map[string]string{
-// 				"":               "",
-// 				"./const.js":     "/path/to/dir/const.js",
-// 				"../const.js":    "/path/to/const.js",
-// 				"./sub/const.js": "/path/to/dir/sub/const.js",
-// 			}},
-// 			"/path/to/lib.js": {"/path/to/lib.js", map[string]string{
-// 				"":               "",
-// 				"./const.js":     "/path/to/const.js",
-// 				"../const.js":    "/path/const.js",
-// 				"./sub/const.js": "/path/to/sub/const.js",
-// 			}},
-// 		}
-// 		for libName, data := range imports {
-// 			libName, data := libName, data
-// 			t.Run("lib=\""+libName+"\"", func(t *testing.T) {
-// 				for constName, constPath := range data.ConstPaths {
-// 					constName, constPath := constName, constPath
-// 					name := "inline"
-// 					if constName != "" {
-// 						name = "const=\"" + constName + "\""
-// 					}
-// 					t.Run(name, func(t *testing.T) {
-// 						fs := afero.NewMemMapFs()
+			if err == nil {
+				_, err = b.Build(nil)
+			}
+			assert.NotNil(t, err)
+			assert.Contains(t, err.Error(), fmt.Sprintf(`"%s" couldn't be found on local disk`, filepath.ToSlash(path)))
+		})
+		t.Run("Invalid", func(t *testing.T) {
+			fs := mapfs.New(map[string]string{
+				"file.js": string([]byte{0x00}),
+			})
+			//assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte{0x00}, 0755))
+			b, err := getSimpleBuilder("/script.js", `import "/file.js"; export default function() {}`, fs)
+			if err == nil {
+				_, err = b.Build(nil)
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "SyntaxError: /file.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
+		})
+		t.Run("Error", func(t *testing.T) {
+			fs := mapfs.New(map[string]string{
+				"file.js": `throw new Error("aaaa")`,
+			})
+			b, err := getSimpleBuilder("/script.js", `import "/file.js"; export default function() {}`, fs)
+			if err == nil {
+				_, err = b.Build(nil)
+			}
+			assert.EqualError(t, err, "Error: aaaa at /file.js:2:7(4)")
+		})
 
-// 						jsLib := `export default function() { return 12345; }`
-// 						if constName != "" {
-// 							jsLib = fmt.Sprintf(
-// 								`import { c } from "%s"; export default function() { return c; }`,
-// 								constName,
-// 							)
+		imports := map[string]struct {
+			LibPath    string
+			ConstPaths map[string]string
+		}{
+			"./lib.js": {"/path/to/lib.js", map[string]string{
+				"":               "",
+				"./const.js":     "/path/to/const.js",
+				"../const.js":    "/path/const.js",
+				"./sub/const.js": "/path/to/sub/const.js",
+			}},
+			"../lib.js": {"/path/lib.js", map[string]string{
+				"":               "",
+				"./const.js":     "/path/const.js",
+				"../const.js":    "/const.js",
+				"./sub/const.js": "/path/sub/const.js",
+			}},
+			"./dir/lib.js": {"/path/to/dir/lib.js", map[string]string{
+				"":               "",
+				"./const.js":     "/path/to/dir/const.js",
+				"../const.js":    "/path/to/const.js",
+				"./sub/const.js": "/path/to/dir/sub/const.js",
+			}},
+			"/path/to/lib.js": {"/path/to/lib.js", map[string]string{
+				"":               "",
+				"./const.js":     "/path/to/const.js",
+				"../const.js":    "/path/const.js",
+				"./sub/const.js": "/path/to/sub/const.js",
+			}},
+		}
+		for libName, data := range imports {
+			libName, data := libName, data
+			t.Run("lib=\""+libName+"\"", func(t *testing.T) {
+				for constName, constPath := range data.ConstPaths {
+					constName, constPath := constName, constPath
+					name := "inline"
+					if constName != "" {
+						name = "const=\"" + constName + "\""
+					}
+					t.Run(name, func(t *testing.T) {
+						fsMap := map[string]string{}
 
-// 							constsrc := `export let c = 12345;`
-// 							assert.NoError(t, fs.MkdirAll(filepath.Dir(constPath), 0755))
-// 							assert.NoError(t, afero.WriteFile(fs, constPath, []byte(constsrc), 0644))
-// 						}
+						jsLib := `export default function() { return 12345; }`
+						if constName != "" {
+							jsLib = fmt.Sprintf(
+								`import { c } from "%s"; export default function() { return c; }`,
+								constName,
+							)
 
-// 						assert.NoError(t, fs.MkdirAll(filepath.Dir(data.LibPath), 0755))
-// 						assert.NoError(t, afero.WriteFile(fs, data.LibPath, []byte(jsLib), 0644))
+							constsrc := `export let c = 12345;`
 
-// 						data := fmt.Sprintf(`
-// 								import fn from "%s";
-// 								let v = fn();
-// 								export default function() {};`,
-// 							libName)
-// 						b, err := getSimpleBundle("/path/to/script.js", data, fs)
-// 						if !assert.NoError(t, err) {
-// 							return
-// 						}
-// 						if constPath != "" {
-// 							assert.Contains(t, b.BaseInitContext.programs, "file://"+constPath)
-// 						}
+							fsMap[strings.TrimPrefix(constPath, "/")] = constsrc
+							fmt.Println("const=", strings.TrimPrefix(constPath, "/"))
+						}
 
-// 						_, err = b.Instantiate()
-// 						if !assert.NoError(t, err) {
-// 							return
-// 						}
-// 					})
-// 				}
-// 			})
-// 		}
+						fsMap[strings.TrimPrefix(data.LibPath, "/")] = jsLib
 
-// 		t.Run("Isolation", func(t *testing.T) {
-// 			fs := afero.NewMemMapFs()
-// 			assert.NoError(t, afero.WriteFile(fs, "/a.js", []byte(`const myvar = "a";`), 0644))
-// 			assert.NoError(t, afero.WriteFile(fs, "/b.js", []byte(`const myvar = "b";`), 0644))
-// 			data := `
-// 				import "./a.js";
-// 				import "./b.js";
-// 				export default function() {
-// 					if (typeof myvar != "undefined") {
-// 						throw new Error("myvar is set in global scope");
-// 					}
-// 				};`
-// 			b, err := getSimpleBundle("/script.js", data, fs)
-// 			if !assert.NoError(t, err) {
-// 				return
-// 			}
+						fs := mapfs.New(fsMap)
 
-// 			bi, err := b.Instantiate()
-// 			if !assert.NoError(t, err) {
-// 				return
-// 			}
-// 			_, err = bi.Default(goja.Undefined())
-// 			assert.NoError(t, err)
-// 		})
-// 	})
-// }
+						data := fmt.Sprintf(`
+								import fn from "%s";
+								let v = fn();
+								export default function() {};`,
+							libName)
+						b, err := getSimpleBuilder("/path/to/script.js", data, fs)
+						if !assert.NoError(t, err) {
+							return
+						}
+						r, err := b.Build(nil)
+						if !assert.NoError(t, err) {
+							return
+						}
+
+						if constPath != "" {
+							assert.Contains(t, r.InitContext.programs, constPath)
+							for key := range r.InitContext.programs {
+								t.Log(key)
+							}
+						}
+
+					})
+				}
+			})
+		}
+
+		t.Run("Isolation", func(t *testing.T) {
+			// fs := afero.NewMemMapFs()
+			// assert.NoError(t, afero.WriteFile(fs, "/a.js", []byte(`const myvar = "a";`), 0644))
+			// assert.NoError(t, afero.WriteFile(fs, "/b.js", []byte(`const myvar = "b";`), 0644))
+
+			fs := mapfs.New(map[string]string{
+				"a.js": `const myvar = "a";`,
+				"b.js": `const myvar = "b";`,
+			})
+
+			data := `
+				import "./a.js";
+				import "./b.js";
+				export default function() {
+					if (typeof myvar != "undefined") {
+						throw new Error("myvar is set in global scope");
+					}
+				};`
+			b, err := getSimpleBuilder("/script.js", data, fs)
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			bi, err := b.Build(nil)
+			if !assert.NoError(t, err) {
+				return
+			}
+			_, err = bi.Default(goja.Undefined())
+			assert.NoError(t, err)
+		})
+	})
+}
 
 // func createAndReadFile(t *testing.T, file string, content []byte, expectedLength int, binary bool) (*Runner, error) {
 
@@ -260,7 +275,7 @@ package js
 // 		}
 // 		export default function() {}
 // 	`, file, binaryArg, expectedLength)
-// 	b, err := getSimpleBundle("/path/to/script.js", data, fs)
+// 	b, err := getSimpleBuilder("/path/to/script.js", data, fs)
 
 // 	if !assert.NoError(t, err) {
 // 		return nil, err
@@ -320,7 +335,7 @@ package js
 
 // 	t.Run("Nonexistent", func(t *testing.T) {
 // 		path := filepath.FromSlash("/nonexistent.txt")
-// 		_, err := getSimpleBundle("/script.js", `open("/nonexistent.txt"); export default function() {}`)
+// 		_, err := getSimpleBuilder("/script.js", `open("/nonexistent.txt"); export default function() {}`)
 // 		assert.EqualError(t, err, fmt.Sprintf("GoError: open %s: file does not exist", path))
 // 	})
 
@@ -328,7 +343,7 @@ package js
 // 		path := filepath.FromSlash("/some/dir")
 // 		fs := afero.NewMemMapFs()
 // 		assert.NoError(t, fs.MkdirAll(path, 0755))
-// 		_, err := getSimpleBundle("/script.js", `open("/some/dir"); export default function() {}`, fs)
+// 		_, err := getSimpleBuilder("/script.js", `open("/some/dir"); export default function() {}`, fs)
 // 		assert.EqualError(t, err, fmt.Sprintf("GoError: open() can't be used with directories, path: %q", path))
 // 	})
 // }
@@ -363,9 +378,9 @@ package js
 // 	assert.NoError(t, fs.MkdirAll("/path/to", 0755))
 // 	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.bin", []byte("hi!"), 0644))
 
-// 	b, err := getSimpleBundle("/path/to/script.js",
+// 	b, err := getSimpleBuilder("/path/to/script.js",
 // 		fmt.Sprintf(`
-// 			import http from "k6/http";
+// 			import http from "k8/http";
 // 			let binFile = open("/path/to/file.bin", "b");
 // 			export default function() {
 // 				var data = {

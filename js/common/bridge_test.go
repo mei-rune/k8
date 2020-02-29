@@ -156,6 +156,46 @@ func (bridgeTestContextAddWithErrorType) ContextAddWithError(ctx context.Context
 	return res, nil
 }
 
+type bridgeTestBridgeContextType struct{}
+
+func (bridgeTestBridgeContextType) Context(ctx BridgeContext) {}
+
+type bridgeTestBridgeContextAddType struct{}
+
+func (bridgeTestBridgeContextAddType) ContextAdd(ctx BridgeContext, a, b int) int {
+	return a + b
+}
+
+type bridgeTestBridgeContextAddWithErrorType struct{}
+
+func (bridgeTestBridgeContextAddWithErrorType) ContextAddWithError(ctx BridgeContext, a, b int) (int, error) {
+	res := a + b
+	if res < 0 {
+		return 0, errors.New("answer is negative")
+	}
+	return res, nil
+}
+
+type bridgeTestBridgeContextPtrType struct{}
+
+func (bridgeTestBridgeContextPtrType) Context(ctx *BridgeContext) {}
+
+type bridgeTestBridgeContextPtrAddType struct{}
+
+func (bridgeTestBridgeContextPtrAddType) ContextAdd(ctx *BridgeContext, a, b int) int {
+	return a + b
+}
+
+type bridgeTestBridgeContextPtrAddWithErrorType struct{}
+
+func (bridgeTestBridgeContextPtrAddWithErrorType) ContextAddWithError(ctx *BridgeContext, a, b int) (int, error) {
+	res := a + b
+	if res < 0 {
+		return 0, errors.New("answer is negative")
+	}
+	return res, nil
+}
+
 type bridgeTestContextInjectType struct {
 	ctx context.Context
 }
@@ -167,6 +207,20 @@ type bridgeTestContextInjectPtrType struct {
 }
 
 func (t *bridgeTestContextInjectPtrType) ContextInjectPtr(ctxPtr *context.Context) { t.ctxPtr = ctxPtr }
+
+type bridgeTestBridgeContextInjectType struct {
+	ctx BridgeContext
+}
+
+func (t *bridgeTestBridgeContextInjectType) ContextInject(ctx BridgeContext) { t.ctx = ctx }
+
+type bridgeTestBridgeContextInjectPtrType struct {
+	ctxPtr *BridgeContext
+}
+
+func (t *bridgeTestBridgeContextInjectPtrType) ContextInjectPtr(ctxPtr *BridgeContext) {
+	t.ctxPtr = ctxPtr
+}
 
 type bridgeTestSumType struct{}
 
@@ -523,6 +577,90 @@ func TestBind(t *testing.T) {
 				})
 			})
 		}},
+		{"BridgeContext", bridgeTestBridgeContextType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			t.Run("Valid", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				_, err := RunString(rt, `obj.context()`)
+				assert.NoError(t, err)
+			})
+		}},
+		{"BridgeContextAdd", bridgeTestBridgeContextAddType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			t.Run("Valid", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				v, err := RunString(rt, `obj.contextAdd(1, 2)`)
+				if assert.NoError(t, err) {
+					assert.Equal(t, int64(3), v.Export())
+				}
+			})
+		}},
+		{"BridgeContextAddWithError", bridgeTestBridgeContextAddWithErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			// _, err := RunString(rt, `obj.contextAddWithError(1, 2)`)
+			// assert.EqualError(t, err, "GoError: contextAddWithError() can only be called from within default()")
+
+			t.Run("Valid", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				v, err := RunString(rt, `obj.contextAddWithError(1, 2)`)
+				if assert.NoError(t, err) {
+					assert.Equal(t, int64(3), v.Export())
+				}
+
+				t.Run("Negative", func(t *testing.T) {
+					_, err := RunString(rt, `obj.contextAddWithError(0, -1)`)
+					assert.EqualError(t, err, "GoError: answer is negative")
+				})
+			})
+		}},
+		{"BridgeContextPtr", bridgeTestBridgeContextPtrType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			// _, err := RunString(rt, `obj.context()`)
+			// assert.EqualError(t, err, "GoError: context() can only be called from within default()")
+
+			t.Run("Valid", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				_, err := RunString(rt, `obj.context()`)
+				assert.NoError(t, err)
+			})
+		}},
+		{"BridgeContextPtrAdd", bridgeTestBridgeContextPtrAddType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			// _, err := RunString(rt, `obj.contextAdd(1, 2)`)
+			// assert.EqualError(t, err, "GoError: contextAdd() can only be called from within default()")
+
+			t.Run("Valid", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				v, err := RunString(rt, `obj.contextAdd(1, 2)`)
+				if assert.NoError(t, err) {
+					assert.Equal(t, int64(3), v.Export())
+				}
+			})
+		}},
+		{"BridgeContextPtrAddWithError", bridgeTestBridgeContextPtrAddWithErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			// _, err := RunString(rt, `obj.contextAddWithError(1, 2)`)
+			// assert.EqualError(t, err, "GoError: contextAddWithError() can only be called from within default()")
+
+			t.Run("Valid", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				v, err := RunString(rt, `obj.contextAddWithError(1, 2)`)
+				if assert.NoError(t, err) {
+					assert.Equal(t, int64(3), v.Export())
+				}
+
+				t.Run("Negative", func(t *testing.T) {
+					_, err := RunString(rt, `obj.contextAddWithError(0, -1)`)
+					assert.EqualError(t, err, "GoError: answer is negative")
+				})
+			})
+		}},
 		{"ContextInject", bridgeTestContextInjectType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
 			_, err := RunString(rt, `obj.contextInject()`)
 			switch impl := obj.(type) {
@@ -550,6 +688,36 @@ func TestBind(t *testing.T) {
 			case *bridgeTestContextInjectPtrType:
 				assert.NoError(t, err)
 				assert.Equal(t, ctxPtr, impl.ctxPtr)
+			}
+		}},
+
+		{"BridgeContextInject", bridgeTestBridgeContextInjectType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.contextInject()`)
+			switch impl := obj.(type) {
+			case bridgeTestBridgeContextInjectType:
+				assert.EqualError(t, err, "TypeError: Object has no member 'contextInject' at <eval>:1:31(3)")
+			case *bridgeTestBridgeContextInjectType:
+				//assert.EqualError(t, err, "GoError: contextInject() can only be called from within default()")
+				//assert.Equal(t, nil, impl.ctx)
+
+				t.Run("Valid", func(t *testing.T) {
+					*ctxPtr = context.Background()
+					defer func() { *ctxPtr = nil }()
+
+					_, err := RunString(rt, `obj.contextInject()`)
+					assert.NoError(t, err)
+					assert.Equal(t, *ctxPtr, *impl.ctx.CtxPtr)
+				})
+			}
+		}},
+		{"BridgeContextInjectPtr", bridgeTestBridgeContextInjectPtrType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.contextInjectPtr()`)
+			switch impl := obj.(type) {
+			case bridgeTestBridgeContextInjectPtrType:
+				assert.EqualError(t, err, "TypeError: Object has no member 'contextInjectPtr' at <eval>:1:34(3)")
+			case *bridgeTestBridgeContextInjectPtrType:
+				assert.NoError(t, err)
+				assert.Equal(t, ctxPtr, impl.ctxPtr.CtxPtr)
 			}
 		}},
 		{"Count", bridgeTestCounterType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
@@ -670,8 +838,11 @@ func TestBind(t *testing.T) {
 				t.Run(data.Name, func(t *testing.T) {
 					rt := goja.New()
 					rt.SetFieldNameMapper(FieldNameMapper{})
+
+					bc := &BridgeContext{CtxPtr: ctxPtr}
+
 					obj := vfn(data.V)
-					rt.Set("obj", Bind(rt, obj, ctxPtr))
+					rt.Set("obj", Bind(rt, obj, bc))
 					data.Fn(t, obj, rt)
 				})
 			}
@@ -801,7 +972,7 @@ func BenchmarkProxy(b *testing.B) {
 						b.ResetTimer()
 
 						for i := 0; i < b.N; i++ {
-							Bind(rt, v, &ctx)
+							Bind(rt, v, &BridgeContext{CtxPtr: &ctx})
 						}
 					})
 
@@ -810,7 +981,7 @@ func BenchmarkProxy(b *testing.B) {
 							rt := goja.New()
 							rt.SetFieldNameMapper(FieldNameMapper{})
 							ctx := context.Background()
-							fn := Bind(rt, v, &ctx)[typ.FnName]
+							fn := Bind(rt, v, &BridgeContext{CtxPtr: &ctx})[typ.FnName]
 							typ.Fn(b, fn)
 						})
 					}

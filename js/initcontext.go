@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"fmt"
 	"time"
 
 	"github.com/dop251/goja"
@@ -37,6 +38,9 @@ import (
 	"github.com/runner-mei/log"
 	"golang.org/x/tools/godoc/vfs"
 )
+	
+const fileSchemeCouldntBeLoadedMsg = `The moduleSpecifier "%s" couldn't be found on ` +
+		`local disk. Make sure that you've specified the right path to the file.`
 
 type programWithSource struct {
 	pgm    *goja.Program
@@ -55,8 +59,7 @@ type InitContext struct {
 	ctxPtr *context.Context
 
 	// Filesystem to load files and scripts from with the map key being the scheme
-	filesystems vfs.NameSpace 
-	pwd         string
+	filesystems vfs.NameSpace
 
 	// Cache of loaded programs and files.
 	programs map[string]programWithSource
@@ -66,8 +69,9 @@ type InitContext struct {
 
 // NewInitContext creates a new initcontext with the provided arguments
 func NewInitContext(
-	logger log.Logger, rt *goja.Runtime, c *compiler.Compiler, compatMode compiler.CompatibilityMode,
-	ctxPtr *context.Context, filesystems vfs.NameSpace , pwd string,
+	logger log.Logger, rt *goja.Runtime, c *compiler.Compiler,
+	compatMode compiler.CompatibilityMode,
+	ctxPtr *context.Context, filesystems vfs.NameSpace,
 ) *InitContext {
 	return &InitContext{
 		logger:            logger,
@@ -75,7 +79,6 @@ func NewInitContext(
 		compiler:          c,
 		ctxPtr:            ctxPtr,
 		filesystems:       filesystems,
-		pwd:               pwd,
 		programs:          make(map[string]programWithSource),
 		compatibilityMode: compatMode,
 	}
@@ -93,32 +96,29 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 		}
 	}
 	return &InitContext{
-		runtime: rt,
-		ctxPtr:  ctxPtr,
-
-		filesystems: base.filesystems,
-		pwd:         base.pwd,
-		compiler:    base.compiler,
-
+		runtime:           rt,
+		ctxPtr:            ctxPtr,
+		filesystems:       base.filesystems,
+		compiler:          base.compiler,
 		programs:          programs,
 		compatibilityMode: base.compatibilityMode,
 	}
 }
 
 // Require is called when a module/file needs to be loaded by a script
-func (i *InitContext) Require(arg string) goja.Value {
+func (i *InitContext) Require(bc *common.BridgeContext, arg string) goja.Value {
 	switch {
 	case arg == "k8", strings.HasPrefix(arg, "k8/"):
-		// Builtin modules ("k6" or "k6/...") are handled specially, as they don't exist on the
+		// Builtin modules ("k8" or "k8/...") are handled specially, as they don't exist on the
 		// filesystem. This intentionally shadows attempts to name your own modules this.
-		v, err := i.requireModule(arg)
+		v, err := i.requireModule(bc, arg)
 		if err != nil {
 			common.Throw(i.runtime, err)
 		}
 		return v
 	default:
 		// Fall back to loading from the filesystem.
-		v, err := i.requireFile(arg)
+		v, err := i.requireFile(bc, arg)
 		if err != nil {
 			common.Throw(i.runtime, err)
 		}
@@ -126,42 +126,50 @@ func (i *InitContext) Require(arg string) goja.Value {
 	}
 }
 
-func (i *InitContext) requireModule(name string) (goja.Value, error) {
+func (i *InitContext) requireModule(bc *common.BridgeContext, name string) (goja.Value, error) {
 	mod, ok := modules.Index[name]
 	if !ok {
 		return nil, errors.Errorf("unknown builtin module: %s", name)
 	}
-	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
+	return i.runtime.ToValue(common.Bind(i.runtime, mod, bc)), nil
 }
 
-func (i *InitContext) requireFile(name string) (goja.Value, error) {
+func (i *InitContext) requireFile(bc *common.BridgeContext, name string) (goja.Value, error) {
+	filename := i.resolveFile(bc, name)
+	filename = filepath.ToSlash(filename)
+
+
+
 	// First, check if we have a cached program already.
-	pgm, ok := i.programs[name]
+	pgm, ok := i.programs[filename]
 	if !ok || pgm.module == nil {
 		exports := i.runtime.NewObject()
 		pgm.module = i.runtime.NewObject()
 		_ = pgm.module.Set("exports", exports)
 
 		if pgm.pgm == nil {
-			_, data, err := i.readFile(name)
+			data, err := i.readFile(filename)
 			if err != nil {
+				if os.IsNotExist(err) {
+				 	return goja.Undefined(), errors.Errorf(fileSchemeCouldntBeLoadedMsg, filename)
+				}
 				return goja.Undefined(), err
 			}
 			pgm.src = string(data)
 
 			// Compile the sources; this handles ES5 vs ES6 automatically.
-			pgm.pgm, err = i.compileImport(pgm.src, name)
+			pgm.pgm, err = i.compileImport(pgm.src, filename)
 			if err != nil {
 				return goja.Undefined(), err
 			}
 		}
 
-		i.programs[name] = pgm
+		i.programs[filename] = pgm
 
 		// Run the program.
 		f, err := i.runtime.RunProgram(pgm.pgm)
 		if err != nil {
-			delete(i.programs, name)
+			delete(i.programs, filename)
 			return goja.Undefined(), err
 		}
 		if call, ok := goja.AssertFunction(f); ok {
@@ -180,32 +188,56 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 	return pgm, err
 }
 
-func (i *InitContext) readFile(name string) (string, []byte, error) {
+
+func (i *InitContext) resolveFile(bc *common.BridgeContext, name string) string {
+
+	fmt.Println("==== resolveFile", name)
+	if strings.HasPrefix(name, ".") {
+		if strings.HasPrefix(name, "./") || strings.HasPrefix(name, ".\\") ||
+		   strings.HasPrefix(name, "../") || strings.HasPrefix(name, "..\\"){
+
+
+	fmt.Println("==== resolveFile.join", bc.CurrentDir, name, filepath.Clean(filepath.Join(string(bc.CurrentDir), name)))
+			return filepath.Clean(filepath.Join(string(bc.CurrentDir), name))
+		}
+	}
+	return name
+}
+
+func (i *InitContext) readFile(name string) ([]byte, error) {
 	if strings.Contains(name, "://") {
 		data, err := fetch(i.logger, name)
-		return name, data, err
+		return  data, err
 	}
-	data, err := vfs.ReadFile(i.filesystems, name)
+	if filepath.IsAbs(name) {
+		data, err := ioutil.ReadFile(name)
+		return  data, err
+	}
+
+	data, err := vfs.ReadFile(i.filesystems, filepath.ToSlash(name))
 	if err == nil {
-		return "", data, nil
+		return data, nil
 	}
-
 	if !os.IsNotExist(err) {
-		return "", nil, err
+		if err == os.ErrNotExist {
+			err = &os.PathError{
+				Op: "read",
+			    Path: name,
+			    Err: err,
+			}
+		}
 	}
-
-	filename := filepath.Join(i.pwd, name)
-	data, err = vfs.ReadFile(i.filesystems, name)
-	return filename, data, err
+	return  nil, err
 }
 
 // Open implements open() in the init context and will read and return the contents of a file
-func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) {
+func (i *InitContext) Open(bc *common.BridgeContext, filename string, args ...string) (goja.Value, error) {
 	if filename == "" {
 		return nil, errors.New("open() can't be used with an empty filename")
 	}
 
-	_, data, err := i.readFile(filename)
+	filename = i.resolveFile(bc, filename)
+	data, err := i.readFile(filename)
 	if err != nil {
 		return nil, err
 	}

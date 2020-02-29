@@ -38,13 +38,13 @@ func New(env *moo.Environment, fs *vfs.NameSpace , filenames []string) (*js.Buil
 	compatMode := env.Config.StringWithDefault("K8_COMPATIBILITY_MODE", "")
 	dir := env.Fs.FromInstallRoot()
 
-	builder, err := js.NewBuilder(logger, dir, fs, compatMode, envvars)
+	builder, err := js.NewBuilder(logger, dir, *fs, compatMode, envvars)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, filename := range filenames {
-		data, err := vfs.ReadFile(fs, filename)
+		data, err := vfs.ReadFile(*fs, filename)
 		if err != nil {
 			return nil, err
 		}

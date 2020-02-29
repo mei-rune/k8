@@ -3,6 +3,7 @@ package js
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/dop251/goja"
 	"github.com/pkg/errors"
@@ -84,13 +85,14 @@ func (b *Builder) Build(rt *goja.Runtime) (*Runner, error) {
 	}
 
 	ctx := context.Background()
-	initCtx := NewInitContext(b.logger, rt, b.compiler, b.compatibilityMode, &ctx,
-		b.filesystems, b.dir)
+	initCtx := NewInitContext(b.logger, rt, b.compiler, 
+		b.compatibilityMode, &ctx, b.filesystems)
 
 	methods := map[string]Method{}
 
 	if len(b.programs) == 1 {
-		name, meta, method, err := b.createMethod(rt, initCtx, b.programs[0].Program, true)
+		name, meta, method, err := b.createMethod(rt,
+			initCtx, b.programs[0].Filename, b.programs[0].Program, true)
 		if err != nil {
 			return nil, err
 		}
@@ -110,6 +112,7 @@ func (b *Builder) Build(rt *goja.Runtime) (*Runner, error) {
 		// A Runner is a self-contained instance of a Bundle.
 		return &Runner{
 			Runtime: rt,
+			InitContext: initCtx,
 			Context: initCtx.ctxPtr,
 			Default: method,
 			Methods: methods,
@@ -117,7 +120,8 @@ func (b *Builder) Build(rt *goja.Runtime) (*Runner, error) {
 	}
 
 	for _, pgm := range b.programs {
-		name, meta, method, err := b.createMethod(rt, initCtx, pgm.Program, false)
+		name, meta, method, err := b.createMethod(rt, 
+			initCtx, pgm.Filename, pgm.Program, false)
 		if err != nil {
 			return nil, err
 		}
@@ -130,19 +134,31 @@ func (b *Builder) Build(rt *goja.Runtime) (*Runner, error) {
 	// A Runner is a self-contained instance of a Bundle.
 	return &Runner{
 		Runtime: rt,
+		InitContext: initCtx, 
 		Context: initCtx.ctxPtr,
 		Methods: methods,
 	}, nil
 }
 
-func (b *Builder) createMethod(rt *goja.Runtime, initCtx *InitContext, pgm *goja.Program, isDefault bool) (string, map[string]interface{}, goja.Callable, error) {
-	exports := b.instantiateEnv(rt, initCtx)
+func (b *Builder) createMethod(rt *goja.Runtime, initCtx *InitContext, filename string, pgm *goja.Program, isDefault bool) (string, map[string]interface{}, goja.Callable, error) {
+	b.instantiateEnv(rt, initCtx)
 
-	unbindInit := common.BindToGlobal(rt, common.Bind(rt, initCtx, initCtx.ctxPtr))
+	unbindInit := common.BindToGlobal(rt, common.Bind(rt, initCtx, 
+		&common.BridgeContext{
+		CurrentDir: common.CurrentDir(filepath.Dir(filename)),
+		CtxPtr: initCtx.ctxPtr,
+	}))
 	if _, err := rt.RunProgram(pgm); err != nil {
 		return "", nil, nil, err
 	}
 	unbindInit()
+
+	// Grab exports.
+	exportsV := rt.Get("exports")
+	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
+		return "", nil,nil, errors.New("exports must be an object")
+	}
+	exports := exportsV.ToObject(rt)
 
 	// Validate the default function.
 	def := exports.Get("default")
@@ -186,6 +202,7 @@ func (b *Builder) instantiateEnv(rt *goja.Runtime, initCtx *InitContext) *goja.O
 	_ = module.Set("exports", exports)
 	rt.Set("module", module)
 	rt.Set("__ENV", b.env)
-	rt.Set("console", common.Bind(rt, newConsole(b.logger), initCtx.ctxPtr))
+	rt.Set("console", common.Bind(rt, newConsole(b.logger), 
+	&common.BridgeContext{		CtxPtr: initCtx.ctxPtr 	}))
 	return exports
 }
