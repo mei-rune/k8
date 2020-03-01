@@ -1,4 +1,4 @@
-package main
+package k8
 
 // import (
 // 	"cn/com/hengwei/pkg/environment"

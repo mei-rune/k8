@@ -104,6 +104,7 @@ func (b *Builder) Build(rt *goja.Runtime) (*Runner, error) {
 				"name": name,
 			}
 		}
+
 		methods[name] = Method{
 			meta:   meta,
 			method: method,

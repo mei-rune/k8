@@ -18,7 +18,9 @@ require (
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 	github.com/pkg/errors v0.9.1
+	github.com/runner-mei/goutils v0.0.0-20200215075957-426da768fd48
 	github.com/runner-mei/log v1.0.2
+	github.com/runner-mei/loong v1.0.7
 	github.com/runner-mei/moo v0.0.0-20200227042737-b53fca99fe68
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/spf13/afero v1.2.2
