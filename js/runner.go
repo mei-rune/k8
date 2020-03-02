@@ -19,8 +19,8 @@ import (
 )
 
 type Method struct {
-	meta   map[string]interface{}
-	method goja.Callable
+	Meta   map[string]interface{}
+	Method goja.Callable
 }
 
 // A Runner is a self-contained instance of a Bundle.
@@ -95,7 +95,7 @@ func (bi *Runner) RunMethod(ctx context.Context, name string, arg interface{}) (
 	if !ok {
 		return nil, ErrMethodMissing
 	}
-	v, err := bi.RunFn(ctx /*group, */, fn.method, bi.Runtime.ToValue(arg))
+	v, err := bi.RunFn(ctx /*group, */, fn.Method, bi.Runtime.ToValue(arg))
 	if err != nil {
 		// deadline is reached so we have timeouted but this might've not been registered correctly
 		if deadline, ok := ctx.Deadline(); ok && time.Now().After(deadline) {

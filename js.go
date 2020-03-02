@@ -82,14 +82,24 @@ func init() {
 			if err != nil {
 				return err
 			}
+
+			var results []map[string]interface{}
+
 			pool := make(chan *js.Runner, 100)
 			for i := 0; i < 100; i++ {
 				r, err := b.Build(nil)
 				if err != nil {
 					return err
 				}
+
+				if i == 0 {
+					for _, method := range r.Methods {
+						results = append(results, method.Meta)
+					}
+				}
 				pool <- r
 			}
+
 			httpSrv.Engine().GET("/k8/:name", func(c *loong.Context) error {
 				r := <-pool
 				defer func() {
@@ -108,6 +118,11 @@ func init() {
 					return c.ReturnError(err)
 				}
 				return c.ReturnQueryResult(result)
+			})
+
+
+			httpSrv.Engine().GET("/k8/meta/methods", func(c *loong.Context) error {				
+				return c.ReturnQueryResult(results)
 			})
 			return nil
 		})

@@ -21,7 +21,7 @@ func TestSimple(t *testing.T) {
 	moo.On(func() moo.Option {
 		return moo.Provide(func() (vfs.NameSpace, k8.OutFiles) {
 			fs := mapfs.New(map[string]string{
-				"scripts/a.js": `module.exports.meta = {name: 'a'};
+				"scripts/a.js": `module.exports.meta = {id: 'a', name: 'a'};
 				module.exports.default = function(args) {
 					return args.a + 1;
 				}`,
@@ -38,7 +38,7 @@ func TestSimple(t *testing.T) {
 	})
 	appTest.Start(t)
 
-	urlStr := urlutil.Join(appTest.URL, appTest.Env.DaemonUrlPath, "/k8/a?a=b")
+	urlStr := urlutil.Join(appTest.URL, appTest.Env.DaemonUrlPath, "/k8/meta/methods")
 	res, err := http.Get(urlStr)
 	if err != nil {
 		t.Error(err)
@@ -58,6 +58,34 @@ func TestSimple(t *testing.T) {
 	}
 
 	s := string(bs)
+	if !strings.Contains(s, "\"name\":\"a\"") {
+		t.Error(s)
+	} else {
+		t.Log(s)
+	}
+
+
+
+	urlStr = urlutil.Join(appTest.URL, appTest.Env.DaemonUrlPath, "/k8/a?a=b")
+	res, err = http.Get(urlStr)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	bs, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if res.StatusCode != http.StatusOK {
+		t.Error(res.Status)
+		t.Error(string(bs))
+		return
+	}
+
+	s = string(bs)
 	if !strings.Contains(s, "\"b1\"") {
 		t.Error(s)
 	} else {

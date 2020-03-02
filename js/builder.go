@@ -106,8 +106,8 @@ func (b *Builder) Build(rt *goja.Runtime) (*Runner, error) {
 		}
 
 		methods[name] = Method{
-			meta:   meta,
-			method: method,
+			Meta:   meta,
+			Method: method,
 		}
 
 		// A Runner is a self-contained instance of a Bundle.
@@ -127,8 +127,8 @@ func (b *Builder) Build(rt *goja.Runtime) (*Runner, error) {
 			return nil, err
 		}
 		methods[name] = Method{
-			meta:   meta,
-			method: method,
+			Meta:   meta,
+			Method: method,
 		}
 	}
 
@@ -183,15 +183,15 @@ func (b *Builder) createMethod(rt *goja.Runtime, initCtx *InitContext, filename 
 		return "", nil, nil, errors.New("meta description must be a object")
 	}
 
-	name, ok := meta["name"]
-	if !ok || name == nil {
+	id, ok := meta["id"]
+	if !ok || id == nil {
 		if isDefault {
 			return "", meta, method, nil
 		}
-		return "", nil, nil, errors.New("name is missing in the meta description")
+		return "", nil, nil, errors.New("id is missing in the meta description")
 	}
 
-	return fmt.Sprint(name), meta, method, nil
+	return fmt.Sprint(id), meta, method, nil
 }
 
 // Instantiates the bundle into an existing runtime. Not public because it also messes with a bunch
