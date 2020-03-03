@@ -135,7 +135,15 @@ func (bi *Runner) RunFn(
 	return fn(goja.Undefined(), args...) // Actually run the JS script
 }
 
-func NewState(logger log.Logger, opts lib.Options, baseDialer net.Dialer, resolver *dnscache.Resolver) (*lib.State, error) {
+func NewState(logger log.Logger, opts lib.Options) (*lib.State, error) {
+	resolver := dnscache.New(0)
+	baseDialer := net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+		DualStack: true,
+	}
+	
+
 	var cipherSuites []uint16
 	if opts.TLSCipherSuites != nil {
 		cipherSuites = *opts.TLSCipherSuites

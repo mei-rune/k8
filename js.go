@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/runner-mei/k8/lib"
 	"github.com/runner-mei/k8/js"
 	"github.com/runner-mei/loong"
 	"github.com/runner-mei/moo"
@@ -101,11 +102,20 @@ func init() {
 				pool <- r
 			}
 
+			state, err := js.NewState(env.Logger.Named("k8"), 
+				lib.Options{})
+			if err != nil {
+				return err
+			}
+
+
+
 			httpSrv.Engine().Any("/k8/:name", func(c *loong.Context) error {
 				r := <-pool
 				defer func() {
 					pool <- r
 				}()
+
 				args := r.Runtime.NewObject()
 				for k, v := range c.QueryParams() {
 					if len(v) == 1 {
@@ -114,7 +124,7 @@ func init() {
 						args.Set(k, v)
 					}
 				}
-				result, err := r.RunMethod(c.StdContext, c.Param("name"), args)
+				result, err := r.RunMethod(lib.WithState(c.StdContext, state), c.Param("name"), args)
 				if err != nil {
 					return c.ReturnError(err)
 				}
@@ -146,7 +156,7 @@ func init() {
 					}
 				}
 
-				result, err := tmpR.RunDefaultMethod(c.StdContext, args)
+				result, err := tmpR.RunDefaultMethod(lib.WithState(c.StdContext, state), args)
 				if err != nil {
 					return c.ReturnError(err)
 				}

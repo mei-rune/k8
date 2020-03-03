@@ -42,5 +42,5 @@ var Index = map[string]interface{}{
 	"k8/html":        html.New(),
 	"k8/ws":          ws.New(),
 	"k8/ssh":         ssh.New(),
-	"k8/telnet":         telnet.New(),
+	"k8/telnet":      telnet.New(),
 }
