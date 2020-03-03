@@ -1,6 +1,7 @@
 package k8
 
 import (
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -100,7 +101,7 @@ func init() {
 				pool <- r
 			}
 
-			httpSrv.Engine().GET("/k8/:name", func(c *loong.Context) error {
+			httpSrv.Engine().Any("/k8/:name", func(c *loong.Context) error {
 				r := <-pool
 				defer func() {
 					pool <- r
@@ -120,8 +121,39 @@ func init() {
 				return c.ReturnQueryResult(result)
 			})
 
+			httpSrv.Engine().POST("/k8/_/run_script", func(c *loong.Context) error {
+				r := <-pool
+				defer func() {
+					pool <- r
+				}()
 
-			httpSrv.Engine().GET("/k8/meta/methods", func(c *loong.Context) error {				
+				data, err := ioutil.ReadAll(c.Request().Body)
+				if err != nil {
+					return c.ReturnError(err)
+				}
+
+				tmpR, err := b.BuildString(r.Runtime, string(data))
+				if err != nil {
+					return c.ReturnError(err)
+				}
+
+				args := tmpR.Runtime.NewObject()
+				for k, v := range c.QueryParams() {
+					if len(v) == 1 {
+						args.Set(k, v[0])
+					} else {
+						args.Set(k, v)
+					}
+				}
+
+				result, err := tmpR.RunDefaultMethod(c.StdContext, args)
+				if err != nil {
+					return c.ReturnError(err)
+				}
+				return c.ReturnQueryResult(result)
+			})
+
+			httpSrv.Engine().GET("/k8/meta/methods", func(c *loong.Context) error {
 				return c.ReturnQueryResult(results)
 			})
 			return nil

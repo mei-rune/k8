@@ -28,6 +28,8 @@ import (
 	"github.com/runner-mei/k8/js/modules/k8/html"
 	"github.com/runner-mei/k8/js/modules/k8/http"
 	"github.com/runner-mei/k8/js/modules/k8/ws"
+	"github.com/runner-mei/k8/js/modules/k8/ssh"
+	"github.com/runner-mei/k8/js/modules/k8/telnet"
 )
 
 // Index of module implementations.
@@ -39,4 +41,6 @@ var Index = map[string]interface{}{
 	"k8/http":        http.New(),
 	"k8/html":        html.New(),
 	"k8/ws":          ws.New(),
+	"k8/ssh":         ssh.New(),
+	"k8/telnet":         telnet.New(),
 }

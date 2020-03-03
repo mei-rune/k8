@@ -71,6 +71,23 @@ func (b *Builder) Compile(filename string, data []byte) error {
 }
 
 func (b *Builder) Build(rt *goja.Runtime) (*Runner, error) {
+	return b.build(rt, b.programs)
+}
+
+
+func (b *Builder) BuildString(rt *goja.Runtime, script string) (*Runner, error) {
+	pgm, _, err := b.compiler.Compile(script, "_default_", "", "", true, b.compatibilityMode)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.build(rt, []Program{{
+		Filename: "_default_",
+		Program:  pgm,
+	} })
+}
+
+func (b *Builder) build(rt *goja.Runtime, programs []Program) (*Runner, error) {
 	if rt == nil {
 		// Make a bundle, instantiate it into a throwaway VM to populate caches.
 		rt = goja.New()
@@ -90,9 +107,9 @@ func (b *Builder) Build(rt *goja.Runtime) (*Runner, error) {
 
 	methods := map[string]Method{}
 
-	if len(b.programs) == 1 {
+	if len(programs) == 1 {
 		name, meta, method, err := b.createMethod(rt,
-			initCtx, b.programs[0].Filename, b.programs[0].Program, true)
+			initCtx, programs[0].Filename, programs[0].Program, true)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +137,7 @@ func (b *Builder) Build(rt *goja.Runtime) (*Runner, error) {
 		}, nil
 	}
 
-	for _, pgm := range b.programs {
+	for _, pgm := range programs {
 		name, meta, method, err := b.createMethod(rt, 
 			initCtx, pgm.Filename, pgm.Program, false)
 		if err != nil {
