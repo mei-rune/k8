@@ -16,11 +16,6 @@ var ErrSSHInInitContext = common.NewInitContextError("using ssh in the init cont
 
 type SSH struct{}
 
-type SSHResponse struct {
-	Status int    `json:"status"`
-	Error  string `json:"error"`
-}
-
 func New() *SSH {
 	return &SSH{}
 }
