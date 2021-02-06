@@ -18,7 +18,7 @@
  *
  */
 
-package js
+package k8
 
 import (
 	"context"
@@ -30,8 +30,7 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/runner-mei/k8/js/compiler"
-	"github.com/runner-mei/log"
+	"github.com/runner-mei/gojs/js/compiler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/godoc/vfs"
@@ -42,38 +41,39 @@ const isWindows = runtime.GOOS == "windows"
 
 func getSimpleBuilder(filename, data string, opts ...interface{}) (*Builder, error) {
 	var (
-		fs                = mapfs.New(map[string]string{})
-		env               = map[string]string{}
-		compatibilityMode string
+		//fs                = mapfs.New(map[string]string{})
+		//env               = map[string]string{}
+		compatibilityMode compiler.CompatibilityMode
 	)
 	for _, o := range opts {
 		switch opt := o.(type) {
-		case vfs.FileSystem:
-			fs = opt
-		case map[string]string:
-			env = opt
-		case string:
+		// case vfs.FileSystem:
+		// 	fs = opt
+		// case map[string]string:
+		// 	env = opt
+		case compiler.CompatibilityMode:
 			compatibilityMode = opt
 		}
 	}
 
-	ns := vfs.NewNameSpace()
-	ns.Bind("/", fs, "/", vfs.BindAfter)
+	// ns := vfs.NewNameSpace()
+	// ns.Bind("/", fs, "/", vfs.BindAfter)
 
-	builder, err := NewBuilder(log.Empty(), "", ns, compatibilityMode, env)
+	builder, err := NewBuilder(compatibilityMode)
 	if err != nil {
 		return nil, err
 	}
 
-	err = builder.Compile(filename, []byte(data))
+	err = builder.Compile(filename, data)
 	return builder, err
 }
 
 func TestNewBuilder(t *testing.T) {
+	ctx := context.Background()
 	t.Run("Blank", func(t *testing.T) {
 		b, err := getSimpleBuilder("/script.js", "")
 		if err == nil {
-			_, err = b.Build(nil)
+			_, err = b.Build(ctx, nil)
 		}
 
 		assert.EqualError(t, err, "script must export a default function")
@@ -81,7 +81,7 @@ func TestNewBuilder(t *testing.T) {
 	t.Run("Invalid", func(t *testing.T) {
 		b, err := getSimpleBuilder("/script.js", "\x00")
 		if err == nil {
-			_, err = b.Build(nil)
+			_, err = b.Build(ctx, nil)
 		}
 		assert.NotNil(t, err)
 		if err != nil {
@@ -91,42 +91,42 @@ func TestNewBuilder(t *testing.T) {
 	t.Run("Error", func(t *testing.T) {
 		b, err := getSimpleBuilder("/script.js", `throw new Error("aaaa");`)
 		if err == nil {
-			_, err = b.Build(nil)
+			_, err = b.Build(ctx, nil)
 		}
 		assert.EqualError(t, err, "Error: aaaa at /script.js:1:7(3)")
 	})
 	t.Run("InvalidExports", func(t *testing.T) {
 		b, err := getSimpleBuilder("/script.js", `exports = null`)
 		if err == nil {
-			_, err = b.Build(nil)
+			_, err = b.Build(ctx, nil)
 		}
 		assert.EqualError(t, err, "exports must be an object")
 	})
 	t.Run("DefaultUndefined", func(t *testing.T) {
 		b, err := getSimpleBuilder("/script.js", `export default undefined;`)
 		if err == nil {
-			_, err = b.Build(nil)
+			_, err = b.Build(ctx, nil)
 		}
 		assert.EqualError(t, err, "script must export a default function")
 	})
 	t.Run("DefaultNull", func(t *testing.T) {
 		b, err := getSimpleBuilder("/script.js", `export default null;`)
 		if err == nil {
-			_, err = b.Build(nil)
+			_, err = b.Build(ctx, nil)
 		}
 		assert.EqualError(t, err, "script must export a default function")
 	})
 	t.Run("DefaultWrongType", func(t *testing.T) {
 		b, err := getSimpleBuilder("/script.js", `export default 12345;`)
 		if err == nil {
-			_, err = b.Build(nil)
+			_, err = b.Build(ctx, nil)
 		}
 		assert.EqualError(t, err, "default export must be a function")
 	})
 	t.Run("Minimal", func(t *testing.T) {
 		b, err := getSimpleBuilder("/script.js", `export default function() {};`)
 		if err == nil {
-			_, err = b.Build(nil)
+			_, err = b.Build(ctx, nil)
 		}
 		assert.NoError(t, err)
 	})
@@ -139,41 +139,41 @@ func TestNewBuilder(t *testing.T) {
 	// })
 	t.Run("CompatibilityMode", func(t *testing.T) {
 		t.Run("Extended/ok/CoreJS", func(t *testing.T) {
-			compatMode := compiler.CompatibilityModeExtended.String()
+			compatMode := compiler.CompatibilityModeExtended
 			b, err := getSimpleBuilder("/script.js",
 				`export default function() {}; new Set([1, 2, 3, 2, 1]);`, compatMode)
 			if err == nil {
-				_, err = b.Build(nil)
+				_, err = b.Build(ctx, nil)
 			}
 			assert.NoError(t, err)
 		})
 		t.Run("Base/ok/Minimal", func(t *testing.T) {
-			compatMode := compiler.CompatibilityModeBase.String()
+			compatMode := compiler.CompatibilityModeBase
 			b, err := getSimpleBuilder("/script.js",
 				`module.exports.default = function() {};`, compatMode)
 			if err == nil {
-				_, err = b.Build(nil)
+				_, err = b.Build(ctx, nil)
 			}
 			assert.NoError(t, err)
 		})
 		t.Run("Base/err", func(t *testing.T) {
 			testCases := []struct {
 				name       string
-				compatMode string
+				compatMode compiler.CompatibilityMode
 				code       string
 				expErr     string
 			}{
-				{"InvalidCompat", "es1", `export default function() {};`,
-					`invalid compatibility mode "es1". Use: "extended", "base"`},
+				// {"InvalidCompat", "es1", `export default function() {};`,
+				// 	`invalid compatibility mode "es1". Use: "extended", "base"`},
 				// ES2015 modules are not supported
-				{"Modules", "base", `export default function() {};`,
+				{"Modules", compiler.CompatibilityModeBase, `export default function() {};`,
 					"/script.js: Line 1:1 Unexpected reserved word"},
 				// Arrow functions are not supported
-				{"ArrowFuncs", "base",
+				{"ArrowFuncs", compiler.CompatibilityModeBase,
 					`module.exports.default = function() {}; () => {};`,
 					"/script.js: Line 1:42 Unexpected token ) (and 1 more errors)"},
 				// ES2015 objects polyfilled by core.js are not supported
-				{"CoreJS", "base",
+				{"CoreJS", compiler.CompatibilityModeBase,
 					`module.exports.default = function() {}; new Set([1, 2, 3, 2, 1]);`,
 					"ReferenceError: Set is not defined at /script.js:1:45(5)"},
 			}
@@ -183,7 +183,7 @@ func TestNewBuilder(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					b, err := getSimpleBuilder("/script.js", tc.code, tc.compatMode)
 					if err == nil {
-						_, err = b.Build(nil)
+						_, err = b.Build(ctx, nil)
 					}
 					assert.EqualError(t, err, tc.expErr)
 				})
@@ -280,6 +280,7 @@ func TestOpen(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for name, fsInit := range fss {
 		t.Run(name, func(t *testing.T) {
 			fs, _, cleanUp := fsInit()
@@ -306,7 +307,7 @@ func TestOpen(t *testing.T) {
 
 					require.NoError(t, err)
 
-					r, err := sourceBuilder.Build(nil)
+					r, err := sourceBuilder.Build(ctx, nil)
 					if tCase.isError {
 						assert.Error(t, err)
 						return
@@ -344,12 +345,12 @@ func TestBuilderInstantiate(t *testing.T) {
 		return
 	}
 
-	bi, err := b.Build(nil)
+	ctx := context.Background()
+	bi, err := b.Build(ctx, nil)
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	ctx := context.Background()
 	t.Run("Run", func(t *testing.T) {
 		v, err := bi.RunDefaultMethod(ctx, goja.Undefined())
 		if assert.NoError(t, err) {
@@ -385,7 +386,8 @@ func TestBuilderEnv(t *testing.T) {
 	assert.Equal(t, "1", env["TEST_A"])
 	assert.Equal(t, "", env["TEST_B"])
 
-	bi, err := b.Build(nil)
+	ctx := context.Background()
+	bi, err := b.Build(ctx, nil)
 	if assert.NoError(t, err) {
 		_, err := bi.RunDefaultMethod(context.Background(), goja.Undefined())
 		assert.NoError(t, err)

@@ -1,47 +1,25 @@
 package k8
 
 import (
+	"context"
 	"io/ioutil"
-	"os"
 	"strings"
 
-	"github.com/runner-mei/k8/lib"
-	"github.com/runner-mei/k8/js"
+	"github.com/runner-mei/gojs"
+	"github.com/runner-mei/gojs/lib"
 	"github.com/runner-mei/loong"
 	"github.com/runner-mei/moo"
 	"golang.org/x/tools/godoc/vfs"
 )
 
-func parseEnvKeyValue(kv string) (string, string) {
-	if idx := strings.IndexRune(kv, '='); idx != -1 {
-		return kv[:idx], kv[idx+1:]
+func New(env *moo.Environment, fs vfs.NameSpace, filenames []string) (*Builder, error) {
+	// logger := env.Logger
+	opts := &gojs.RuntimeOptions{
+		IncludeSystemEnvVars: strings.ToLower(env.Config.StringWithDefault("K8_INCLUDE_SYSTEM_ENV_VARS", "true")) == "true",
+		CompatibilityMode:    env.Config.StringWithDefault("K8_COMPATIBILITY_MODE", ""),
 	}
-	return kv, ""
-}
 
-func collectEnv() map[string]string {
-	env := make(map[string]string)
-	for _, kv := range os.Environ() {
-		k, v := parseEnvKeyValue(kv)
-		env[k] = v
-	}
-	return env
-}
-
-func New(env *moo.Environment, fs vfs.NameSpace, filenames []string) (*js.Builder, error) {
-	logger := env.Logger
-
-	var envvars map[string]string
-	if env.Config.BoolWithDefault("K8_INCLUDE_SYSTEM_ENV_VARS", true) {
-		envvars = collectEnv()
-	}
-	if envvars == nil {
-		envvars = map[string]string{}
-	}
-	compatMode := env.Config.StringWithDefault("K8_COMPATIBILITY_MODE", "")
-	dir := env.Fs.FromInstallRoot()
-
-	builder, err := js.NewBuilder(logger, dir, fs, compatMode, envvars)
+	builder, err := NewBuilder(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +29,7 @@ func New(env *moo.Environment, fs vfs.NameSpace, filenames []string) (*js.Builde
 		if err != nil {
 			return nil, err
 		}
-		err = builder.Compile(filename, data)
+		err = builder.Compile(filename, string(data))
 		if err != nil {
 			return nil, err
 		}
@@ -72,7 +50,7 @@ type InFiles struct {
 }
 
 func init() {
-	moo.On(func() moo.Option {
+	moo.On(func(*moo.Environment) moo.Option {
 		return moo.Invoke(func(env *moo.Environment, fs vfs.NameSpace, infilenames InFiles, httpSrv *moo.HTTPServer) error {
 			filenames := make([]string, 0, 64)
 			for _, nm := range infilenames.Filenames {
@@ -87,9 +65,10 @@ func init() {
 
 			var results []map[string]interface{}
 
-			pool := make(chan *js.Runner, 100)
+			ctx := context.Background()
+			pool := make(chan *Runner, 100)
 			for i := 0; i < 100; i++ {
-				r, err := b.Build(nil)
+				r, err := b.Build(ctx, nil)
 				if err != nil {
 					return err
 				}
@@ -102,13 +81,10 @@ func init() {
 				pool <- r
 			}
 
-			state, err := js.NewState(env.Logger.Named("k8"), 
-				lib.Options{})
+			state, err := lib.NewState(env.Logger.Named("k8"), lib.Options{})
 			if err != nil {
 				return err
 			}
-
-
 
 			httpSrv.Engine().Any("/k8/:name", func(c *loong.Context) error {
 				r := <-pool
@@ -142,7 +118,7 @@ func init() {
 					return c.ReturnError(err)
 				}
 
-				tmpR, err := b.BuildString(r.Runtime, string(data))
+				tmpR, err := b.BuildString(ctx, r.Runtime, string(data))
 				if err != nil {
 					return c.ReturnError(err)
 				}

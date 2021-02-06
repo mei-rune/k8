@@ -10,14 +10,17 @@ require (
 	github.com/andybalholm/brotli v1.0.0
 	github.com/dlclark/regexp2 v1.2.0 // indirect
 	github.com/dop251/goja v0.0.0-20200223111000-2a7d122434f4
+	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.2+incompatible // indirect
 	github.com/gorilla/websocket v1.4.1
 	github.com/klauspost/compress v1.10.2
+	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/mccutchen/go-httpbin v1.1.1
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 	github.com/pkg/errors v0.9.1
+	github.com/runner-mei/gojs v0.0.0-20210126143527-48654b3bfce8
 	github.com/runner-mei/goutils v0.0.0-20200215075957-426da768fd48
 	github.com/runner-mei/log v1.0.2
 	github.com/runner-mei/loong v1.0.7
@@ -29,6 +32,7 @@ require (
 	github.com/viki-org/dnscache v0.0.0-20130720023526-c70c1f23c5d8
 	golang.org/x/crypto v0.0.0-20200221231518-2aa609cf4a9d
 	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
+	golang.org/x/time v0.0.0-20201208040808-7e3f01d25324 // indirect
 	golang.org/x/tools v0.0.0-20200227222343-706bc42d1f0d
 	gopkg.in/guregu/null.v3 v3.4.0
 )
