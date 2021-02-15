@@ -145,12 +145,6 @@ func (b *Builder) createMethod(ctx context.Context, rt *gojs.Runtime, filename s
 	}
 	exports := exportsV.ToObject(rt.Runtime)
 
-	bs, err := exports.MarshalJSON()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(string(bs))
-
 	// Validate the default function.
 	def := exports.Get("default")
 	if def == nil || goja.IsNull(def) || goja.IsUndefined(def) {
