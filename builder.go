@@ -134,12 +134,22 @@ func (b *Builder) createMethod(ctx context.Context, rt *gojs.Runtime, filename s
 	isDefault bool) (string, map[string]interface{}, goja.Callable, error) {
 	gojs.InstantiateEnv(rt)
 
+	if _, err := rt.RunProgram(ctx, pgm); err != nil {
+		return "", nil, nil, err
+	}
+
 	// Grab exports.
 	exportsV := rt.Get("exports")
 	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
 		return "", nil, nil, errors.New("exports must be an object")
 	}
 	exports := exportsV.ToObject(rt.Runtime)
+
+	bs, err := exports.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(bs))
 
 	// Validate the default function.
 	def := exports.Get("default")
