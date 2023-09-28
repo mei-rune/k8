@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
-	"github.com/runner-mei/goutils/shell/harness"
+	"tech.hengwei.com.cn/go/goutils/shell/harness"
 	"github.com/runner-mei/k8/js/common"
 	"github.com/runner-mei/k8/lib"
 	"github.com/runner-mei/k8/js/modules/k8/ssh"

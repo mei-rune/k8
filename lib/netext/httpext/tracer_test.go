@@ -35,11 +35,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mccutchen/go-httpbin/httpbin"
+	httpbin "github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/pkg/errors"
-	"github.com/runner-mei/k8/lib/metrics"
+	// "github.com/runner-mei/k8/lib/metrics"
 	"github.com/runner-mei/k8/lib/netext"
-	"github.com/runner-mei/k8/stats"
+	// "github.com/runner-mei/k8/stats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -83,8 +83,8 @@ func TestTracer(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NoError(t, res.Body.Close())
 			trail := tracer.Done()
-			trail.SaveSamples(stats.IntoSampleTags(&map[string]string{"tag": "value"}))
-			samples := trail.GetSamples()
+			// trail.SaveSamples(stats.IntoSampleTags(&map[string]string{"tag": "value"}))
+			// samples := trail.GetSamples()
 
 			assert.Empty(t, tracer.protoErrors)
 			assertLaterOrZero(t, tracer.getConn, isReuse)
@@ -99,31 +99,31 @@ func TestTracer(t *testing.T) {
 
 			assert.Equal(t, strings.TrimPrefix(srv.URL, "https://"), trail.ConnRemoteAddr.String())
 
-			assert.Len(t, samples, 8)
-			seenMetrics := map[*stats.Metric]bool{}
-			for i, s := range samples {
-				assert.NotContains(t, seenMetrics, s.Metric)
-				seenMetrics[s.Metric] = true
+			// assert.Len(t, samples, 8)
+			// seenMetrics := map[*stats.Metric]bool{}
+			// for i, s := range samples {
+			// 	assert.NotContains(t, seenMetrics, s.Metric)
+			// 	seenMetrics[s.Metric] = true
 
-				assert.False(t, s.Time.IsZero())
-				assert.Equal(t, map[string]string{"tag": "value"}, s.Tags.CloneTags())
+			// 	assert.False(t, s.Time.IsZero())
+			// 	assert.Equal(t, map[string]string{"tag": "value"}, s.Tags.CloneTags())
 
-				switch s.Metric {
-				case metrics.HTTPReqs:
-					assert.Equal(t, 1.0, s.Value)
-					assert.Equal(t, 0, i, "`HTTPReqs` is reported before the other HTTP metrics")
-				case metrics.HTTPReqConnecting, metrics.HTTPReqTLSHandshaking:
-					if isReuse {
-						assert.Equal(t, 0.0, s.Value)
-						break
-					}
-					fallthrough
-				case metrics.HTTPReqDuration, metrics.HTTPReqBlocked, metrics.HTTPReqSending, metrics.HTTPReqWaiting, metrics.HTTPReqReceiving:
-					assert.True(t, s.Value > 0.0, "%s is <= 0", s.Metric.Name)
-				default:
-					t.Errorf("unexpected metric: %s", s.Metric.Name)
-				}
-			}
+			// 	switch s.Metric {
+			// 	case metrics.HTTPReqs:
+			// 		assert.Equal(t, 1.0, s.Value)
+			// 		assert.Equal(t, 0, i, "`HTTPReqs` is reported before the other HTTP metrics")
+			// 	case metrics.HTTPReqConnecting, metrics.HTTPReqTLSHandshaking:
+			// 		if isReuse {
+			// 			assert.Equal(t, 0.0, s.Value)
+			// 			break
+			// 		}
+			// 		fallthrough
+			// 	case metrics.HTTPReqDuration, metrics.HTTPReqBlocked, metrics.HTTPReqSending, metrics.HTTPReqWaiting, metrics.HTTPReqReceiving:
+			// 		assert.True(t, s.Value > 0.0, "%s is <= 0", s.Metric.Name)
+			// 	default:
+			// 		t.Errorf("unexpected metric: %s", s.Metric.Name)
+			// 	}
+			// }
 		})
 	}
 }

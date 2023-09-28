@@ -32,7 +32,7 @@ import (
 
 	// "github.com/runner-mei/k8/stats"
 	"github.com/stretchr/testify/assert"
-	"github.com/runner-mei/goutils/shell/harness"
+	"tech.hengwei.com.cn/go/goutils/shell/harness"
 )
 
 func TestSession(t *testing.T) {

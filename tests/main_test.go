@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runner-mei/goutils/urlutil"
+	"tech.hengwei.com.cn/go/goutils/urlutil"
 	"github.com/runner-mei/k8"
-	"github.com/runner-mei/moo"
-	"github.com/runner-mei/moo/moo_tests"
+	"tech.hengwei.com.cn/go/moo"
+	"tech.hengwei.com.cn/go/moo/moo_tests"
 	"golang.org/x/tools/godoc/vfs"
 	"golang.org/x/tools/godoc/vfs/mapfs"
 )

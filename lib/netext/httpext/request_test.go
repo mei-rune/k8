@@ -12,7 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runner-mei/k8/lib"
-	"github.com/runner-mei/k8/stats"
+	// "github.com/runner-mei/k8/stats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -97,7 +97,9 @@ func TestMakeRequestError(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		state := &lib.State{
-			Options:   lib.Options{RunTags: &stats.SampleTags{}},
+			Options:   lib.Options{
+				// RunTags: &stats.SampleTags{},
+			},
 			Transport: srv.Client().Transport,
 		}
 		ctx = lib.WithState(ctx, state)
