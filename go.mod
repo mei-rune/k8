@@ -11,9 +11,12 @@ require (
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/dlclark/regexp2 v1.2.0 // indirect
-	github.com/dop251/goja v0.0.0-20200811154920-cd0eddb06559
+	github.com/dop251/goja v0.0.0-20200223111000-2a7d122434f4
+	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/go-sourcemap/sourcemap v2.1.2+incompatible // indirect
 	github.com/gorilla/websocket v1.4.1
 	github.com/klauspost/compress v1.10.2
+	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/mccutchen/go-httpbin v1.1.1
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
