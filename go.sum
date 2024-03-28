@@ -9,7 +9,6 @@ emperror.dev/errors v0.8.0/go.mod h1:YcRvLPh626Ubn2xqtoprejnA5nFha+TJ+2vew48kWuE
 emperror.dev/errors v0.8.1 h1:UavXZ5cSX/4u9iyvH6aDcuGkVjeexUGJ7Ij7G4VfQT0=
 emperror.dev/errors v0.8.1/go.mod h1:YcRvLPh626Ubn2xqtoprejnA5nFha+TJ+2vew48kWuE=
 gitee.com/opengauss/openGauss-connector-go-pq v1.0.2/go.mod h1:iGO30dANt2l6pO09C/5i0UgWanu1bDMeFdG0fldAE5g=
-gitee.com/runner.mei/dm v0.0.0-20220207044607-a9ba0dc20bf7/go.mod h1:QGFsdjGTWX7H+RXoGcXvnQdghfGcjHVGm+iWFCdwC7w=
 gitee.com/runner.mei/gokb v0.0.0-20211216112635-582e81b3d7ad/go.mod h1:JFhswQCXRyuO3Cem86EcC1I6qV1NgOxeJ+HRCmz1Ozo=
 github.com/Azure/go-ntlmssp v0.0.0-20191115210519-2b2be6cc8ed4 h1:jxtswewdgihgXM6ayHYtISwzkAOaRzyXpgUMamb8mHw=
 github.com/Azure/go-ntlmssp v0.0.0-20191115210519-2b2be6cc8ed4/go.mod h1:chxPXzSsl7ZWRAuOIE23GDNzjWuZquvFlgA8xmpunjU=
