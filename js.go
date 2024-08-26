@@ -8,7 +8,7 @@ import (
 	"github.com/runner-mei/gojs"
 	"github.com/runner-mei/gojs/lib"
 	"github.com/runner-mei/loong"
-	"github.com/runner-mei/moo"
+	"tech.hengwei.com.cn/go/moo"
 	"golang.org/x/tools/godoc/vfs"
 )
 
