@@ -89,7 +89,7 @@ func TestNewBuilder(t *testing.T) {
 		if err == nil {
 			_, err = b.Build(ctx, nil)
 		}
-		assert.EqualError(t, err, "Error: aaaa at /script.js:1:7(3)")
+		assert.EqualError(t, err, "Error: aaaa at /script.js:1:7(2)")
 	})
 	t.Run("InvalidExports", func(t *testing.T) {
 		b, err := getSimpleBuilder("/script.js", `exports = null`)
@@ -164,10 +164,11 @@ func TestNewBuilder(t *testing.T) {
 				// ES2015 modules are not supported
 				{"Modules", gojs.CompatibilityModeBase, `export default function() {};`,
 					"/script.js: Line 1:1 Unexpected reserved word"},
-				// Arrow functions are not supported
-				{"ArrowFuncs", gojs.CompatibilityModeBase,
-					`module.exports.default = function() {}; () => {};`,
-					"/script.js: Line 1:42 Unexpected token ) (and 1 more errors)"},
+				// Arrow functions are supported by the goja parser since it gained
+				// ES6 syntax support, so this no longer produces an error.
+				// {"ArrowFuncs", gojs.CompatibilityModeBase,
+				// 	`module.exports.default = function() {}; () => {};`,
+				// 	"/script.js: Line 1:42 Unexpected token ) (and 1 more errors)"},
 				// ES2015 objects polyfilled by core.js are not supported
 				// {"CoreJS", gojs.CompatibilityModeBase,
 				// 	`module.exports.default = function() {}; new Set([1, 2, 3, 2, 1]);`,

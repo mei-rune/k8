@@ -17,3 +17,5 @@ vendor/
 
 *-gen.go
 *.gobatis.go
+tests/data/
+.vscode/

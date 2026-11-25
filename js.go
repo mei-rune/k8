@@ -2,17 +2,19 @@ package k8
 
 import (
 	"context"
+	"io/fs"
 	"io/ioutil"
 	"strings"
 
+	"github.com/boo-admin/boo/engine/echov5functions"
+	"github.com/labstack/echo/v5"
 	"github.com/runner-mei/gojs"
 	"github.com/runner-mei/gojs/lib"
-	"github.com/runner-mei/loong"
+	"github.com/runner-mei/log"
 	"tech.hengwei.com.cn/go/moo"
-	"golang.org/x/tools/godoc/vfs"
 )
 
-func New(env *moo.Environment, fs vfs.NameSpace, filenames []string) (*Builder, error) {
+func New(env *moo.Environment, fsys fs.FS, filenames []string) (*Builder, error) {
 	// logger := env.Logger
 	opts := &gojs.RuntimeOptions{
 		IncludeSystemEnvVars: strings.ToLower(env.Config.StringWithDefault("K8_INCLUDE_SYSTEM_ENV_VARS", "true")) == "true",
@@ -25,7 +27,7 @@ func New(env *moo.Environment, fs vfs.NameSpace, filenames []string) (*Builder, 
 	}
 
 	for _, filename := range filenames {
-		data, err := vfs.ReadFile(fs, filename)
+		data, err := fs.ReadFile(fsys, filename)
 		if err != nil {
 			return nil, err
 		}
@@ -51,14 +53,14 @@ type InFiles struct {
 
 func init() {
 	moo.On(func(*moo.Environment) moo.Option {
-		return moo.Invoke(func(env *moo.Environment, fs vfs.NameSpace, infilenames InFiles, httpSrv *moo.HTTPServer) error {
+		return moo.Invoke(func(env *moo.Environment, fsys fs.FS, infilenames InFiles, httpSrv *moo.HTTPServer) error {
 			filenames := make([]string, 0, 64)
 			for _, nm := range infilenames.Filenames {
 				for _, n := range nm {
 					filenames = append(filenames, n)
 				}
 			}
-			b, err := New(env, fs, filenames)
+			b, err := New(env, fsys, filenames)
 			if err != nil {
 				return err
 			}
@@ -81,12 +83,12 @@ func init() {
 				pool <- r
 			}
 
-			state, err := lib.NewState(env.Logger.Named("k8"), lib.Options{})
+			state, err := lib.NewState(log.FromSlogger(env.Logger).Named("k8"), lib.Options{})
 			if err != nil {
 				return err
 			}
 
-			httpSrv.Engine().Any("/k8/:name", func(c *loong.Context) error {
+			httpSrv.Engine().Any("/k8/:name", func(c *echo.Context) error {
 				r := <-pool
 				defer func() {
 					pool <- r
@@ -100,14 +102,14 @@ func init() {
 						args.Set(k, v)
 					}
 				}
-				result, err := r.RunMethod(lib.WithState(c.StdContext, state), c.Param("name"), args)
+				result, err := r.RunMethod(lib.WithState(echov5functions.GetContext(c), state), c.Param("name"), args)
 				if err != nil {
-					return c.ReturnError(err)
+					return echov5functions.ReturnError(c, err)
 				}
-				return c.ReturnQueryResult(result)
+				return echov5functions.ReturnQueryResult(c, result)
 			})
 
-			httpSrv.Engine().POST("/k8/_/run_script", func(c *loong.Context) error {
+			httpSrv.Engine().POST("/k8/_/run_script", func(c *echo.Context) error {
 				r := <-pool
 				defer func() {
 					pool <- r
@@ -115,12 +117,12 @@ func init() {
 
 				data, err := ioutil.ReadAll(c.Request().Body)
 				if err != nil {
-					return c.ReturnError(err)
+					return echov5functions.ReturnError(c, err)
 				}
 
 				tmpR, err := b.BuildString(ctx, r.Runtime, string(data))
 				if err != nil {
-					return c.ReturnError(err)
+					return echov5functions.ReturnError(c, err)
 				}
 
 				args := tmpR.Runtime.NewObject()
@@ -132,15 +134,15 @@ func init() {
 					}
 				}
 
-				result, err := tmpR.RunDefaultMethod(lib.WithState(c.StdContext, state), args)
+				result, err := tmpR.RunDefaultMethod(lib.WithState(echov5functions.GetContext(c), state), args)
 				if err != nil {
-					return c.ReturnError(err)
+					return echov5functions.ReturnError(c, err)
 				}
-				return c.ReturnQueryResult(result)
+				return echov5functions.ReturnQueryResult(c, result)
 			})
 
-			httpSrv.Engine().GET("/k8/meta/methods", func(c *loong.Context) error {
-				return c.ReturnQueryResult(results)
+			httpSrv.Engine().GET("/k8/meta/methods", func(c *echo.Context) error {
+				return echov5functions.ReturnQueryResult(c, results)
 			})
 			return nil
 		})
